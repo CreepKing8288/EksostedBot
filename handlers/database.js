@@ -1,8 +1,12 @@
-require('dotenv').config();
 const mongoose = require('mongoose');
 module.exports = async (client) => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI);
+    const mongoUri = process.env.MONGODB_URI;
+    if (!mongoUri) {
+      throw new Error('MONGODB_URI is not defined in the environment.');
+    }
+
+    await mongoose.connect(mongoUri);
     client.db = mongoose.connection.db;
     console.log(global.styles.infoColor('✅ Connected to MongoDB'));
   } catch (error) {

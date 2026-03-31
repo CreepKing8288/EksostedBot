@@ -19,20 +19,25 @@ const { autoPlayFunction } = require('./functions/autoPlay');
 
 const defaultEnvPath = path.join(__dirname, '.env');
 const explicitEnvFile = process.env.ENV_FILE ? path.join(__dirname, process.env.ENV_FILE) : null;
+const requiredEnvVars = ['DISCORD_TOKEN', 'MONGODB_URI'];
+const missingRequiredEnv = requiredEnvVars.some((key) => !process.env[key]);
 let envPath = null;
 
-if (explicitEnvFile && fs.existsSync(explicitEnvFile)) {
-  envPath = explicitEnvFile;
-} else if (fs.existsSync(defaultEnvPath)) {
-  envPath = defaultEnvPath;
-}
-
-if (envPath) {
-  dotenv.config({ path: envPath });
-  console.log(`✅ Loaded environment from ${path.basename(envPath)}`);
+if (!missingRequiredEnv) {
+  console.log('✅ Environment variables already provided; skipping local env file load.');
 } else {
-  console.log('⚠️ No local env file found. Loading from system environment only. Set ENV_FILE to choose a specific file if needed.');
-  dotenv.config();
+  if (explicitEnvFile && fs.existsSync(explicitEnvFile)) {
+    envPath = explicitEnvFile;
+  } else if (fs.existsSync(defaultEnvPath)) {
+    envPath = defaultEnvPath;
+  }
+
+  if (envPath) {
+    dotenv.config({ path: envPath });
+    console.log(`✅ Loaded environment from ${path.basename(envPath)}`);
+  } else {
+    console.log('⚠️ No local env file found. Using system environment only. Set ENV_FILE to choose a specific file if needed.');
+  }
 }
 
 const client = new Client({
