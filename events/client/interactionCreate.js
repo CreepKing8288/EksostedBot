@@ -31,6 +31,29 @@ module.exports = {
       }
     }
 
+    if (interaction.isButton()) {
+      try {
+        if (interaction.customId.startsWith('reply_confession_')) {
+          const targetNum = interaction.customId.replace('reply_confession_', '');
+          const isBanned = await interaction.client.db.collection('bans').findOne({ user_id: interaction.user.id });
+          if (isBanned) {
+            return interaction.reply({ content: 'You are currently banned from using the confession system.', ephemeral: true });
+          }
+
+          const replyModal = require('../../modals/replyModal');
+          await interaction.showModal(replyModal.create(targetNum));
+          return;
+        }
+      } catch (error) {
+        console.error('Button interaction error:', error);
+        if (interaction.replied || interaction.deferred) {
+          await interaction.followUp({ content: 'There was an error processing your button.', flags: [MessageFlags.Ephemeral] });
+        } else {
+          await interaction.reply({ content: 'There was an error processing your button.', flags: [MessageFlags.Ephemeral] });
+        }
+      }
+    }
+
     if (interaction.isModalSubmit()) {
       try {
         if (interaction.customId === 'confession_modal') {

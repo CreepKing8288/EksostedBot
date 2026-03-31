@@ -1,4 +1,4 @@
-const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder } = require('discord.js');
+const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 const isValidUrl = (value) => {
   if (!value) return false;
@@ -65,7 +65,12 @@ module.exports = {
       { $inc: { count: 1 } },
       { upsert: true, returnDocument: 'after' }
     );
-    const num = counterDoc.value?.count ?? 1780;
+
+    let num = counterDoc.value?.count;
+    if (num == null) {
+      const fallbackCounter = await client.db.collection('settings').findOne({ _id: 'counter' });
+      num = fallbackCounter?.count ?? 1;
+    }
 
     // 2. Send to Public Channel
     const confChannel = await client.channels.fetch(config.confession_channel_id).catch(() => null);
@@ -82,7 +87,14 @@ module.exports = {
       .setColor('Random');
     
     if (attachment) embed.setImage(attachment);
-    await confChannel.send({ embeds: [embed] });
+
+    const replyButton = new ButtonBuilder()
+      .setCustomId(`reply_confession_${num}`)
+      .setLabel('Reply')
+      .setStyle(ButtonStyle.Primary);
+
+    const row = new ActionRowBuilder().addComponents(replyButton);
+    await confChannel.send({ embeds: [embed], components: [row] });
 
     // 3. Send to Log Channel
     const logChannel = await client.channels.fetch(config.log_channel_id).catch(() => null);

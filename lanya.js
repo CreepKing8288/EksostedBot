@@ -5,8 +5,9 @@ app.get('/', (req, res) => {
   res.send('Everything is up!');
 });
 
-app.listen(10000, () => {
-  console.log('✅ Express server running on http://localhost:10000');
+const port = process.env.PORT || 10000;
+app.listen(port, () => {
+  console.log(`✅ Express server running on http://localhost:${port}`);
 });
 const dotenv = require('dotenv');
 const { Client, GatewayIntentBits } = require('discord.js');
@@ -16,16 +17,21 @@ const path = require('path');
 const chalk = require('chalk');
 const { autoPlayFunction } = require('./functions/autoPlay');
 
-const envFiles = [
-  path.join(__dirname, '.env'),
-  path.join(__dirname, 'EksostedBot.env'),
-  path.join(__dirname, 'EksostedConfModule.env'),
-];
-const envPath = envFiles.find((file) => fs.existsSync(file));
+const defaultEnvPath = path.join(__dirname, '.env');
+const explicitEnvFile = process.env.ENV_FILE ? path.join(__dirname, process.env.ENV_FILE) : null;
+let envPath = null;
+
+if (explicitEnvFile && fs.existsSync(explicitEnvFile)) {
+  envPath = explicitEnvFile;
+} else if (fs.existsSync(defaultEnvPath)) {
+  envPath = defaultEnvPath;
+}
+
 if (envPath) {
   dotenv.config({ path: envPath });
   console.log(`✅ Loaded environment from ${path.basename(envPath)}`);
 } else {
+  console.log('⚠️ No local env file found. Loading from system environment only. Set ENV_FILE to choose a specific file if needed.');
   dotenv.config();
 }
 

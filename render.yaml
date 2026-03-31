@@ -3,7 +3,7 @@ services:
     name: lanya
     env: node
     plan: free
-    buildCommand: bun install
-    startCommand: bun start
+    buildCommand: npm install
+    startCommand: npm start
     autoDeploy: true
     pullRequestPreviewsEnabled: true
