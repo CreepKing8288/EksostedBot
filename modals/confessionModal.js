@@ -81,6 +81,28 @@ module.exports = {
       });
     }
 
+    if (config.last_confession_message_id) {
+      const previousMessage = await confChannel.messages.fetch(config.last_confession_message_id).catch(() => null);
+      if (previousMessage) {
+        const updatedRows = previousMessage.components
+          .map((row) => {
+            const filteredButtons = row.components.filter(
+              (component) => component.customId !== 'open_confession_modal'
+            );
+            return filteredButtons.length
+              ? new ActionRowBuilder().addComponents(filteredButtons)
+              : null;
+          })
+          .filter(Boolean);
+
+        if (updatedRows.length > 0) {
+          await previousMessage.edit({ components: updatedRows });
+        } else {
+          await previousMessage.edit({ components: [] });
+        }
+      }
+    }
+
     const embed = new EmbedBuilder()
       .setTitle(`Anonymous Confession (#${num})`)
       .setDescription(`"${content}"`)
@@ -93,8 +115,17 @@ module.exports = {
       .setLabel('Reply')
       .setStyle(ButtonStyle.Primary);
 
-    const row = new ActionRowBuilder().addComponents(replyButton);
-    await confChannel.send({ embeds: [embed], components: [row] });
+    const confessButton = new ButtonBuilder()
+      .setCustomId('open_confession_modal')
+      .setLabel('Confess')
+      .setStyle(ButtonStyle.Success);
+
+    const row = new ActionRowBuilder().addComponents(replyButton, confessButton);
+    const confessionMessage = await confChannel.send({ embeds: [embed], components: [row] });
+    await client.db.collection('settings').updateOne(
+      { _id: 'config' },
+      { $set: { last_confession_message_id: confessionMessage.id } }
+    );
 
     // 3. Send to Log Channel
     const logChannel = await client.channels.fetch(config.log_channel_id).catch(() => null);
