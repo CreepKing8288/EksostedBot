@@ -1,4 +1,4 @@
-const { Events, MessageFlags } = require('discord.js');
+const { Events, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 module.exports = {
   name: Events.InteractionCreate,
@@ -54,6 +54,48 @@ module.exports = {
           const replyModal = require('../../modals/replyModal');
           await interaction.showModal(replyModal.create(targetNum));
           return;
+        }
+
+        if (interaction.customId.startsWith('claimcrate_')) {
+          const size = interaction.customId.replace('claimcrate_', '');
+          const CrateConfig = require('../../models/CrateConfig');
+          const { MemberData } = require('../../models/Level');
+
+          const config = await CrateConfig.findOne({ guildId: interaction.guild.id });
+          if (!config || !config.enabled) {
+            return interaction.reply({ content: 'Crate drops are currently disabled.', ephemeral: true });
+          }
+
+          const points = config.points?.[size] || 0;
+          if (!points) {
+            return interaction.reply({ content: 'This crate size is not configured correctly.', ephemeral: true });
+          }
+
+          let memberData = await MemberData.findOne({ guildId: interaction.guild.id, userId: interaction.user.id });
+          if (!memberData) {
+            memberData = new MemberData({
+              guildId: interaction.guild.id,
+              userId: interaction.user.id,
+              level: 1,
+              xp: 0,
+              totalXp: 0,
+            });
+          }
+
+          memberData.xp += points;
+          memberData.totalXp += points;
+          await memberData.save();
+
+          const row = interaction.message.components[0];
+          if (row) {
+            const button = ButtonBuilder.from(row.components[0]).setDisabled(true);
+            await interaction.message.edit({ components: [new ActionRowBuilder().addComponents(button)] });
+          }
+
+          return interaction.reply({
+            content: `You claimed a **${size} crate** and earned **${points} XP**!`,
+            ephemeral: true,
+          });
         }
       } catch (error) {
         console.error('Button interaction error:', error);
