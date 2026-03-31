@@ -1,5 +1,15 @@
 const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder } = require('discord.js');
 
+const isValidUrl = (value) => {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
+
 module.exports = {
   // The "create" helper used by the /confess command
   create: () => {
@@ -36,15 +46,36 @@ module.exports = {
 
     // 1. Get Config & Counter
     const config = await client.db.collection('settings').findOne({ _id: 'config' });
+    if (!config?.confession_channel_id || !config?.log_channel_id) {
+      return interaction.followUp({
+        content: 'The confession system is not configured yet. Please ask an administrator to set the confession and log channels.',
+        ephemeral: true,
+      });
+    }
+
+    if (attachment && !isValidUrl(attachment)) {
+      return interaction.followUp({
+        content: 'The attachment URL is invalid. Please provide a valid http or https link, or leave it blank.',
+        ephemeral: true,
+      });
+    }
+
     const counterDoc = await client.db.collection('settings').findOneAndUpdate(
       { _id: 'counter' },
       { $inc: { count: 1 } },
       { upsert: true, returnDocument: 'after' }
     );
-    const num = counterDoc.count || 1780;
+    const num = counterDoc.value?.count ?? 1780;
 
     // 2. Send to Public Channel
-    const confChannel = await client.channels.fetch(config.confession_channel_id);
+    const confChannel = await client.channels.fetch(config.confession_channel_id).catch(() => null);
+    if (!confChannel) {
+      return interaction.followUp({
+        content: 'The confession channel could not be found. Please ask an administrator to reconfigure it.',
+        ephemeral: true,
+      });
+    }
+
     const embed = new EmbedBuilder()
       .setTitle(`Anonymous Confession (#${num})`)
       .setDescription(`"${content}"`)
@@ -54,7 +85,13 @@ module.exports = {
     await confChannel.send({ embeds: [embed] });
 
     // 3. Send to Log Channel
-    const logChannel = await client.channels.fetch(config.log_channel_id);
+    const logChannel = await client.channels.fetch(config.log_channel_id).catch(() => null);
+    if (!logChannel) {
+      return interaction.followUp({
+        content: 'The confession log channel could not be found. Please ask an administrator to reconfigure it.',
+        ephemeral: true,
+      });
+    }
     const logEmbed = new EmbedBuilder()
       .setTitle('Confession Log')
       .addFields(

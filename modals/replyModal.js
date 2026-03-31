@@ -1,5 +1,15 @@
 const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder } = require('discord.js');
 
+const isValidUrl = (value) => {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
+
 module.exports = {
   // The "create" helper used by the /reply command or buttons
   create: (targetNum = null) => {
@@ -46,7 +56,20 @@ module.exports = {
 
     // 1. Fetch Config
     const config = await client.db.collection('settings').findOne({ _id: 'config' });
-    const confChannel = await client.channels.fetch(config.confession_channel_id);
+    if (!config?.confession_channel_id || !config?.log_channel_id) {
+      return interaction.followUp({
+        content: 'The confession system is not configured. Please ask an administrator to set both the confession and log channels.',
+        ephemeral: true,
+      });
+    }
+
+    const confChannel = await client.channels.fetch(config.confession_channel_id).catch(() => null);
+    if (!confChannel) {
+      return interaction.followUp({
+        content: 'The confession channel could not be found. Please ask an administrator to reconfigure it.',
+        ephemeral: true,
+      });
+    }
 
     // 2. Find the target confession message to start/find a thread
     const messages = await confChannel.messages.fetch({ limit: 100 });
@@ -71,7 +94,7 @@ module.exports = {
       { $inc: { count: 1 } },
       { upsert: true, returnDocument: 'after' }
     );
-    const replyId = counterDoc.count;
+    const replyId = counterDoc.value?.count ?? 1780;
 
     // 5. Send Reply to Thread
     const replyEmbed = new EmbedBuilder()
@@ -79,12 +102,26 @@ module.exports = {
       .setDescription(`"${replyContent}"`)
       .setColor('Random');
 
-    if (attachment) replyEmbed.setImage(attachment);
+    if (attachment) {
+      if (!isValidUrl(attachment)) {
+        return interaction.followUp({
+          content: 'The attachment URL is invalid. Please provide a valid http or https link, or leave it blank.',
+          ephemeral: true,
+        });
+      }
+      replyEmbed.setImage(attachment);
+    }
 
     await thread.send({ embeds: [replyEmbed] });
 
     // 6. Log the Reply
-    const logChannel = await client.channels.fetch(config.log_channel_id);
+    const logChannel = await client.channels.fetch(config.log_channel_id).catch(() => null);
+    if (!logChannel) {
+      return interaction.followUp({
+        content: 'The confession log channel could not be found. Please ask an administrator to reconfigure it.',
+        ephemeral: true,
+      });
+    }
     const logEmbed = new EmbedBuilder()
       .setTitle('Reply Log')
       .setColor('Green')

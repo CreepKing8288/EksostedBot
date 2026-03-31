@@ -19,7 +19,20 @@ module.exports = {
   execute: async (interaction, client) => {
     const reason = interaction.fields.getTextInputValue('explanation');
     const config = await client.db.collection('settings').findOne({ _id: 'config' });
-    const logChannel = await client.channels.fetch(config.log_channel_id);
+    if (!config?.log_channel_id) {
+      return interaction.reply({
+        content: 'The appeal system is not configured. Please ask an administrator to set the log channel first.',
+        ephemeral: true,
+      });
+    }
+
+    const logChannel = await client.channels.fetch(config.log_channel_id).catch(() => null);
+    if (!logChannel) {
+      return interaction.reply({
+        content: 'The appeal log channel could not be found. Please ask an administrator to reconfigure it.',
+        ephemeral: true,
+      });
+    }
 
     await logChannel.send({
       content: `🚨 **NEW APPEAL**\n**User:** ${interaction.user} (${interaction.user.id})\n**Reason:** ${reason}`
