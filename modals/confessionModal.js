@@ -93,7 +93,12 @@ module.exports = {
       .setLabel('Reply')
       .setStyle(ButtonStyle.Primary);
 
-    const row = new ActionRowBuilder().addComponents(replyButton);
+    const confessButton = new ButtonBuilder()
+      .setCustomId('open_confession_modal')
+      .setLabel('Confess')
+      .setStyle(ButtonStyle.Success);
+
+    const row = new ActionRowBuilder().addComponents(replyButton, confessButton);
     await confChannel.send({ embeds: [embed], components: [row] });
 
     // 3. Send to Log Channel

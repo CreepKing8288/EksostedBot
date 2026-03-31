@@ -33,6 +33,17 @@ module.exports = {
 
     if (interaction.isButton()) {
       try {
+        if (interaction.customId === 'open_confession_modal') {
+          const isBanned = await interaction.client.db.collection('bans').findOne({ user_id: interaction.user.id });
+          if (isBanned) {
+            return interaction.reply({ content: 'You are currently banned from using the confession system.', ephemeral: true });
+          }
+
+          const confessionModal = require('../../modals/confessionModal');
+          await interaction.showModal(confessionModal.create());
+          return;
+        }
+
         if (interaction.customId.startsWith('reply_confession_')) {
           const targetNum = interaction.customId.replace('reply_confession_', '');
           const isBanned = await interaction.client.db.collection('bans').findOne({ user_id: interaction.user.id });
