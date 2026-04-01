@@ -45,7 +45,7 @@ module.exports = {
       const key = subcommand === 'setchannel' ? 'confession_channel_id' : 'log_channel_id';
 
       await client.db.collection('settings').updateOne(
-        { _id: 'config' },
+        { _id: 'config', guildId: interaction.guild.id },
         { $set: { [key]: channel.id } },
         { upsert: true }
       );
@@ -85,7 +85,7 @@ module.exports = {
     if (subcommand === 'remove') {
       const link = interaction.options.getString('link');
       const messageId = link.split('/').pop();
-      const config = await client.db.collection('settings').findOne({ _id: 'config' });
+      const config = await client.db.collection('settings').findOne({ _id: 'config', guildId: interaction.guild.id });
 
       try {
         const channel = await client.channels.fetch(config.confession_channel_id);

@@ -18,7 +18,7 @@ module.exports = {
 
   execute: async (interaction, client) => {
     const reason = interaction.fields.getTextInputValue('explanation');
-    const config = await client.db.collection('settings').findOne({ _id: 'config' });
+    const config = await client.db.collection('settings').findOne({ _id: 'config', guildId: interaction.guild.id });
     if (!config?.log_channel_id) {
       return interaction.reply({
         content: 'The appeal system is not configured. Please ask an administrator to set the log channel first.',

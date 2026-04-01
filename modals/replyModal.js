@@ -10,18 +10,19 @@ const isValidUrl = (value) => {
   }
 };
 
-const getCounterDocument = async (db) => {
+const getCounterDocument = async (db, counterId, guildId) => {
+  const query = { _id: counterId, guildId };
   const updateOptions = { upsert: true, returnDocument: 'after' };
   try {
     return await db.collection('settings').findOneAndUpdate(
-      { _id: 'reply_counter' },
+      query,
       { $inc: { count: 1 } },
       updateOptions
     );
   } catch (error) {
     if (error.message.includes('returnDocument') || error.message.includes('returnOriginal')) {
       return await db.collection('settings').findOneAndUpdate(
-        { _id: 'reply_counter' },
+        query,
         { $inc: { count: 1 } },
         { upsert: true, returnOriginal: false }
       );
@@ -82,7 +83,7 @@ module.exports = {
     }
 
     // 1. Fetch Config
-    const config = await client.db.collection('settings').findOne({ _id: 'config' });
+    const config = await client.db.collection('settings').findOne({ _id: 'config', guildId: interaction.guild.id });
     if (!config?.confession_channel_id || !config?.log_channel_id) {
       return interaction.followUp({
         content: 'The confession system is not configured. Please ask an administrator to set both the confession and log channels.',
@@ -123,7 +124,7 @@ module.exports = {
       });
     }
 
-    const counterDoc = await getCounterDocument(client.db);
+    const counterDoc = await getCounterDocument(client.db, 'reply_counter', interaction.guild.id);
     const replyId = counterDoc?.value?.count ?? 1;
 
     // 5. Send Reply to Thread
