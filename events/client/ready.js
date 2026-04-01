@@ -4,6 +4,7 @@ const serverStatusUpdater = require('../../functions/serverStatusUpdater');
 const updateStatus = require('../../functions/statusRotation');
 const fs = require('fs');
 const path = require('path');
+const voiceStateUpdate = require('../voiceStateUpdate');
 
 module.exports = {
   name: Events.ClientReady,
@@ -13,6 +14,9 @@ module.exports = {
     serverStatusUpdater(client);
     updateStatus(client);
     client.lavalink.init({ id: client.user.id });
+    if (typeof voiceStateUpdate.initialize === 'function') {
+      await voiceStateUpdate.initialize(client);
+    }
     client.on('raw', (packet) => client.lavalink.sendRawData(packet));
     const commandFolderPath = path.join(__dirname, '../../commands');
     const categories = fs

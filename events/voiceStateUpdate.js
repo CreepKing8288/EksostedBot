@@ -3,6 +3,8 @@ const { MemberData, GuildSettings } = require('../models/Level');
 const levelUpEvent = require('./levelUp');
 
 const activeVoiceTimers = new Map();
+let voiceTicker = null;
+let clientInstance = null;
 
 const createVoiceKey = (guildId, userId) => `${guildId}:${userId}`;
 const isVoiceActive = (state) =>
@@ -17,16 +19,24 @@ const calculateXpNeeded = (level, guildData) => {
   return (guildData.startingXp || 100) + (level - 1) * (guildData.xpPerLevel || 50);
 };
 
-const awardVoiceXp = async (guild, memberId, durationMs) => {
+const calculateVoiceXp = (durationMs, xpRate, allowPartial = false) => {
+  const seconds = Math.floor(durationMs / 1000);
+  const wholeMinutes = Math.floor(seconds / 60);
+  if (wholeMinutes > 0) return wholeMinutes * xpRate;
+  if (allowPartial && seconds > 0) return xpRate;
+  return 0;
+};
+
+const awardVoiceXp = async (guild, memberId, durationMs, allowPartial = false) => {
   if (durationMs <= 0 || !guild) return;
 
   const guildData = await GuildSettings.findOne({ guildId: guild.id });
   if (!guildData || !guildData.levelingEnabled) return;
 
-  const durationSeconds = Math.floor(durationMs / 1000);
-  const xpRate = guildData.xpRate || 1;
-  const xpToAdd = Math.max(Math.floor(durationSeconds / 60), 1) * xpRate;
+  const xpToAdd = calculateVoiceXp(durationMs, guildData.xpRate || 1, allowPartial);
+  if (!xpToAdd) return;
 
+  const durationSeconds = Math.floor(durationMs / 1000);
   let memberData = await MemberData.findOne({ guildId: guild.id, userId: memberId });
   if (!memberData) {
     memberData = new MemberData({
@@ -45,18 +55,15 @@ const awardVoiceXp = async (guild, memberId, durationMs) => {
   memberData.voiceXp = (memberData.voiceXp || 0) + xpToAdd;
   memberData.voiceSeconds = (memberData.voiceSeconds || 0) + durationSeconds;
 
-  let leveledUp = false;
   let previousLevel = memberData.level;
-
   while (memberData.xp >= calculateXpNeeded(memberData.level, guildData)) {
     memberData.xp -= calculateXpNeeded(memberData.level, guildData);
     memberData.level += 1;
-    leveledUp = true;
   }
 
   await memberData.save();
 
-  if (leveledUp) {
+  if (memberData.level > previousLevel) {
     try {
       await levelUpEvent.assignRoles(
         { guild, author: { id: memberId } },
@@ -69,35 +76,92 @@ const awardVoiceXp = async (guild, memberId, durationMs) => {
   }
 };
 
+const startVoiceTicker = (client) => {
+  if (voiceTicker) return;
+  clientInstance = client;
+  voiceTicker = setInterval(async () => {
+    if (!clientInstance) return;
+
+    const now = Date.now();
+    for (const [key, timer] of activeVoiceTimers.entries()) {
+      const [guildId] = key.split(':');
+      const elapsed = now - timer.lastClaimed;
+      const fullMinuteMs = Math.floor(elapsed / 60000) * 60000;
+      if (fullMinuteMs <= 0) continue;
+
+      const guild = clientInstance.guilds.cache.get(guildId);
+      if (!guild) continue;
+      await awardVoiceXp(guild, key.split(':')[1], fullMinuteMs, false);
+      timer.lastClaimed += fullMinuteMs;
+    }
+  }, 30000);
+};
+
+const initializeActiveVoiceSessions = (client) => {
+  client.guilds.cache.forEach((guild) => {
+    guild.channels.cache
+      .filter((channel) => channel.isVoiceBased())
+      .forEach((channel) => {
+        channel.members.forEach((member) => {
+          if (!member.user.bot && isVoiceActive(member.voice)) {
+            const key = createVoiceKey(guild.id, member.id);
+            if (!activeVoiceTimers.has(key)) {
+              activeVoiceTimers.set(key, {
+                since: Date.now(),
+                lastClaimed: Date.now(),
+              });
+            }
+          }
+        });
+      });
+  });
+};
+
 module.exports = {
   name: Events.VoiceStateUpdate,
+  async initialize(client) {
+    startVoiceTicker(client);
+    initializeActiveVoiceSessions(client);
+  },
   async execute(oldState, newState) {
     const guild = oldState.guild || newState.guild;
     if (!guild) return;
 
-    const client = oldState.client;
+    const client = oldState.client || newState.client;
+    startVoiceTicker(client);
+
     const member = newState.member || oldState.member;
-    const userId = member?.user?.id;
-    const key = userId ? createVoiceKey(guild.id, userId) : null;
+    if (!member || member.user.bot) return;
+
+    const userId = member.user.id;
+    const key = createVoiceKey(guild.id, userId);
 
     const oldActive = isVoiceActive(oldState);
     const newActive = isVoiceActive(newState);
 
-    if (userId && oldActive && !newActive && activeVoiceTimers.has(key)) {
-      const startTime = activeVoiceTimers.get(key);
-      const durationMs = Date.now() - startTime;
+    if (oldActive && !newActive) {
+      if (activeVoiceTimers.has(key)) {
+        const timer = activeVoiceTimers.get(key);
+        activeVoiceTimers.delete(key);
+        const durationMs = Date.now() - timer.lastClaimed;
+        await awardVoiceXp(guild, userId, durationMs, true);
+      } else {
+        await awardVoiceXp(guild, userId, 60000, true);
+      }
+    }
+
+    if (!oldActive && newActive && !activeVoiceTimers.has(key)) {
+      activeVoiceTimers.set(key, {
+        since: Date.now(),
+        lastClaimed: Date.now(),
+      });
+    }
+
+    if (!newActive && activeVoiceTimers.has(key)) {
       activeVoiceTimers.delete(key);
-      await awardVoiceXp(guild, userId, durationMs);
     }
 
-    if (userId && newActive && !activeVoiceTimers.has(key)) {
-      activeVoiceTimers.set(key, Date.now());
-    }
-
-    if (userId && !newActive && activeVoiceTimers.has(key)) {
-      activeVoiceTimers.delete(key);
-    }
-
+    if (!client.lavalink) return;
     const player = client.lavalink.players.get(guild.id);
     if (!player) return;
 
