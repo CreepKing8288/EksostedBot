@@ -1,11 +1,104 @@
 const { Events } = require('discord.js');
+const { MemberData, GuildSettings } = require('../models/Level');
+const levelUpEvent = require('./levelUp');
+
+const activeVoiceTimers = new Map();
+
+const createVoiceKey = (guildId, userId) => `${guildId}:${userId}`;
+const isVoiceActive = (state) =>
+  state?.channelId &&
+  state.member &&
+  !state.member.user.bot &&
+  !state.selfMute &&
+  !state.serverMute;
+
+const calculateXpNeeded = (level, guildData) => {
+  if (level === 1) return guildData.startingXp || 100;
+  return (guildData.startingXp || 100) + (level - 1) * (guildData.xpPerLevel || 50);
+};
+
+const awardVoiceXp = async (guild, memberId, durationMs) => {
+  if (durationMs <= 0 || !guild) return;
+
+  const guildData = await GuildSettings.findOne({ guildId: guild.id });
+  if (!guildData || !guildData.levelingEnabled) return;
+
+  const durationSeconds = Math.floor(durationMs / 1000);
+  const xpRate = guildData.xpRate || 1;
+  const xpToAdd = Math.max(Math.floor(durationSeconds / 60), 1) * xpRate;
+
+  let memberData = await MemberData.findOne({ guildId: guild.id, userId: memberId });
+  if (!memberData) {
+    memberData = new MemberData({
+      guildId: guild.id,
+      userId: memberId,
+      level: 1,
+      xp: 0,
+      totalXp: 0,
+      voiceXp: 0,
+      voiceSeconds: 0,
+    });
+  }
+
+  memberData.xp = (memberData.xp || 0) + xpToAdd;
+  memberData.totalXp = (memberData.totalXp || 0) + xpToAdd;
+  memberData.voiceXp = (memberData.voiceXp || 0) + xpToAdd;
+  memberData.voiceSeconds = (memberData.voiceSeconds || 0) + durationSeconds;
+
+  let leveledUp = false;
+  let previousLevel = memberData.level;
+
+  while (memberData.xp >= calculateXpNeeded(memberData.level, guildData)) {
+    memberData.xp -= calculateXpNeeded(memberData.level, guildData);
+    memberData.level += 1;
+    leveledUp = true;
+  }
+
+  await memberData.save();
+
+  if (leveledUp) {
+    try {
+      await levelUpEvent.assignRoles(
+        { guild, author: { id: memberId } },
+        previousLevel + 1,
+        memberData.level
+      );
+    } catch (err) {
+      console.error('Error assigning roles after voice XP:', err);
+    }
+  }
+};
 
 module.exports = {
   name: Events.VoiceStateUpdate,
   async execute(oldState, newState) {
-    const client = oldState.client;
-    const player = client.lavalink.players.get(oldState.guild.id);
+    const guild = oldState.guild || newState.guild;
+    if (!guild) return;
 
+    const client = oldState.client;
+    const member = newState.member || oldState.member;
+    const userId = member?.user?.id;
+    const key = userId ? createVoiceKey(guild.id, userId) : null;
+
+    const oldActive = isVoiceActive(oldState);
+    const newActive = isVoiceActive(newState);
+
+    if (userId && oldActive && !newActive && activeVoiceTimers.has(key)) {
+      const startTime = activeVoiceTimers.get(key);
+      const durationMs = Date.now() - startTime;
+      activeVoiceTimers.delete(key);
+      await awardVoiceXp(guild, userId, durationMs);
+    }
+
+    if (userId && newActive && !activeVoiceTimers.has(key)) {
+      activeVoiceTimers.set(key, Date.now());
+    }
+
+    if (userId && !newActive && activeVoiceTimers.has(key)) {
+      activeVoiceTimers.delete(key);
+    }
+
+    const player = client.lavalink.players.get(guild.id);
     if (!player) return;
 
     if (oldState.id === client.user.id && !newState.channelId) {
@@ -13,23 +106,17 @@ module.exports = {
       return;
     }
 
-    const voiceChannel = oldState.guild.channels.cache.get(
-      player.voiceChannelId
-    );
+    const voiceChannel = guild.channels.cache.get(player.voiceChannelId);
     if (!voiceChannel) return;
 
-    const members = voiceChannel.members.filter(
-      (member) => !member.user.bot
-    ).size;
+    const members = voiceChannel.members.filter((member) => !member.user.bot).size;
 
     if (members === 0) {
       player.inactivityTimeout = setTimeout(() => {
         if (player.playing) player.stopPlaying();
         player.destroy();
 
-        const textChannel = oldState.guild.channels.cache.get(
-          player.textChannelId
-        );
+        const textChannel = guild.channels.cache.get(player.textChannelId);
         if (textChannel) {
           textChannel.send(
             '👋 Left the voice channel due to inactivity (3 minutes with no listeners)'

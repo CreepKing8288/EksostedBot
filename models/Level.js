@@ -14,8 +14,8 @@ const memberDataSchema = new mongoose.Schema({
   userId: { type: String, required: true },
   level: { type: Number, default: 1 },
   xp: { type: Number, default: 0 },
-  totalXp: { type: Number, default: 0 },
-});
+  totalXp: { type: Number, default: 0 },  voiceXp: { type: Number, default: 0 },
+  voiceSeconds: { type: Number, default: 0 },});
 
 memberDataSchema.index({ guildId: 1, userId: 1 }, { unique: true });
 
