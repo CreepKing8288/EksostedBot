@@ -125,10 +125,17 @@ module.exports = {
           })
           .filter(Boolean);
 
-        if (updatedRows.length > 0) {
-          await previousMessage.edit({ components: updatedRows });
-        } else {
-          await previousMessage.edit({ components: [] });
+        try {
+          if (updatedRows.length > 0) {
+            await previousMessage.edit({ components: updatedRows });
+          } else {
+            await previousMessage.edit({ components: [] });
+          }
+        } catch (error) {
+          if (error.code !== 50001) {
+            throw error;
+          }
+          console.warn('Unable to disable previous confession button due to missing permissions or access.');
         }
       }
     }
