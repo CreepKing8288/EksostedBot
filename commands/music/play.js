@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { formatTime } = require('../../utils/utils');
+const spotify = require('../../utils/spotify');
 
 const autocompleteMap = new Map();
 
@@ -49,7 +50,23 @@ module.exports = {
         ]);
       }
 
-      const source = 'spsearch';
+      const source = interaction.options.getString('source') || 'spsearch';
+
+      if (source === 'spsearch') {
+        const spotifyResults = await spotify.searchSpotifyTracks(query, 25);
+        if (!spotifyResults.length) {
+          return await interaction.respond([
+            { name: 'No results found', value: 'no_results' },
+          ]);
+        }
+
+        return await interaction.respond(
+          spotifyResults.map((track) => ({
+            name: `${track.name} - ${track.artists.map((a) => a.name).join(', ')}`,
+            value: track.external_urls.spotify,
+          }))
+        );
+      }
 
       player = interaction.client.lavalink.createPlayer({
         guildId: interaction.guildId,
@@ -138,12 +155,111 @@ module.exports = {
 
     await interaction.deferReply();
 
-    if (query.startsWith('playlist_')) {
-      const actualQuery = query.replace('playlist_', '');
-      search = await player.search({ query: actualQuery, source });
+    let search;
+
+    if (source === 'spsearch') {
+      const spotifyLink = spotify.parseSpotifyLink(query);
+
+      if (spotifyLink?.type === 'playlist') {
+        const spotifyTracks = await spotify.getSpotifyPlaylistTracks(
+          spotifyLink.id,
+          100
+        );
+
+        if (!spotifyTracks.length) {
+          return interaction.editReply({
+            content: '❌ No playlist was found on Spotify for that link.',
+            ephemeral: true,
+          });
+        }
+
+        let addedCount = 0;
+        let firstArtwork = null;
+
+        for (const spotifyTrack of spotifyTracks) {
+          const spotifySearch = await player.search({
+            query: spotify.buildSpotifyTrackQuery(spotifyTrack),
+            source: 'ytsearch',
+          });
+
+          if (!spotifySearch?.tracks?.length) {
+            continue;
+          }
+
+          const lavalinkTrack = spotifySearch.tracks[0];
+          if (!firstArtwork) {
+            firstArtwork = lavalinkTrack.info.artworkUrl;
+          }
+
+          lavalinkTrack.userData = { requester: interaction.member };
+          await player.queue.add(lavalinkTrack);
+          addedCount += 1;
+        }
+
+        if (!addedCount) {
+          return interaction.editReply({
+            content:
+              '❌ Spotify playlist was found, but no playable tracks could be loaded.',
+            ephemeral: true,
+          });
+        }
+
+        const playlistEmbed = new EmbedBuilder()
+          .setColor('#DDA0DD')
+          .setAuthor({
+            name: 'Added Spotify Playlist to Queue 📃',
+            iconURL: client.user.displayAvatarURL(),
+          })
+          .setTitle('Spotify Playlist Added')
+          .setThumbnail(firstArtwork || client.user.displayAvatarURL())
+          .setDescription(`Added \\`${addedCount}\\` tracks from the Spotify playlist.`)
+          .addFields([
+            {
+              name: '🎵 Tracks Added',
+              value: `${addedCount} tracks successfully queued`,
+              inline: true,
+            },
+          ])
+          .setFooter({
+            text: `Added by ${interaction.user.tag}`,
+            iconURL: interaction.user.displayAvatarURL(),
+          })
+          .setTimestamp();
+
+        if (!player.playing) {
+          await player.play();
+        }
+
+        return interaction.editReply({ embeds: [playlistEmbed] });
+      }
+
+      if (spotifyLink?.type === 'track') {
+        const spotifyTrack = await spotify.getSpotifyTrack(spotifyLink.id);
+        search = await player.search({
+          query: spotify.buildSpotifyTrackQuery(spotifyTrack),
+          source: 'ytsearch',
+        });
+      } else {
+        const spotifyResults = await spotify.searchSpotifyTracks(query, 1);
+        if (!spotifyResults.length) {
+          return interaction.editReply({
+            content: '❌ No results found! Try a different search term.',
+            ephemeral: true,
+          });
+        }
+
+        search = await player.search({
+          query: spotify.buildSpotifyTrackQuery(spotifyResults[0]),
+          source: 'ytsearch',
+        });
+      }
     } else {
-      const isURL = query.startsWith('http://') || query.startsWith('https://');
-      search = await player.search({ query, source });
+      if (query.startsWith('playlist_')) {
+        const actualQuery = query.replace('playlist_', '');
+        search = await player.search({ query: actualQuery, source });
+      } else {
+        search = await player.search({ query, source });
+      }
     }
 
     if (!search?.tracks?.length) {
