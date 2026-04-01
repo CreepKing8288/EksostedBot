@@ -15,8 +15,22 @@ const memberDataSchema = new mongoose.Schema({
   userId: { type: String, required: true },
   level: { type: Number, default: 1 },
   xp: { type: Number, default: 0 },
-  totalXp: { type: Number, default: 0 },  voiceXp: { type: Number, default: 0 },
-  voiceSeconds: { type: Number, default: 0 },});
+  totalXp: { type: Number, default: 0 },
+  voiceXp: { type: Number, default: 0 },
+  voiceSeconds: { type: Number, default: 0 },
+  aboutMe: { type: String, default: 'No bio set.' },
+  achievements: {
+    type: [
+      {
+        title: { type: String, required: true },
+        description: { type: String, required: true },
+        iconUrl: { type: String, default: null },
+        earnedAt: { type: Date, default: Date.now },
+      },
+    ],
+    default: [],
+  },
+});
 
 memberDataSchema.index({ guildId: 1, userId: 1 }, { unique: true });
 

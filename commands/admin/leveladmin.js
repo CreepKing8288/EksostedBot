@@ -130,6 +130,52 @@ module.exports = {
     )
     .addSubcommand((subcommand) =>
       subcommand
+        .setName('awardachievement')
+        .setDescription('Award an achievement to a user')
+        .addUserOption((option) =>
+          option
+            .setName('user')
+            .setDescription('The user to award')
+            .setRequired(true)
+        )
+        .addStringOption((option) =>
+          option
+            .setName('title')
+            .setDescription('Achievement title')
+            .setRequired(true)
+        )
+        .addStringOption((option) =>
+          option
+            .setName('description')
+            .setDescription('Achievement description')
+            .setRequired(true)
+        )
+        .addStringOption((option) =>
+          option
+            .setName('iconurl')
+            .setDescription('Optional icon URL for the achievement')
+            .setRequired(false)
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName('removeachievement')
+        .setDescription('Remove an achievement from a user')
+        .addUserOption((option) =>
+          option
+            .setName('user')
+            .setDescription('The user to remove achievement from')
+            .setRequired(true)
+        )
+        .addStringOption((option) =>
+          option
+            .setName('title')
+            .setDescription('Achievement title to remove')
+            .setRequired(true)
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
         .setName('toggle')
         .setDescription('Turn the level system on or off')
         .addStringOption((option) =>
@@ -380,6 +426,98 @@ module.exports = {
           .setTitle('Leaderboard Banner Set')
           .setDescription('The leaderboard banner image has been updated.')
           .setColor('Green');
+
+        await interaction.reply({ embeds: [embed] });
+        break;
+      }
+      case 'awardachievement': {
+        if (!guildData.levelingEnabled) {
+          return interaction.reply({
+            content: 'Leveling system is not enabled in this Server',
+          });
+        }
+
+        const user = interaction.options.getUser('user');
+        const title = interaction.options.getString('title');
+        const description = interaction.options.getString('description');
+        const iconUrl = interaction.options.getString('iconurl');
+
+        let memberData = await MemberData.findOne({
+          guildId: interaction.guild.id,
+          userId: user.id,
+        });
+
+        if (!memberData) {
+          memberData = new MemberData({
+            guildId: interaction.guild.id,
+            userId: user.id,
+            level: 1,
+            xp: 0,
+            totalXp: 0,
+            voiceXp: 0,
+            voiceSeconds: 0,
+            aboutMe: 'No bio set.',
+            achievements: [],
+          });
+        }
+
+        memberData.achievements.push({
+          title,
+          description,
+          iconUrl: iconUrl || null,
+          earnedAt: new Date(),
+        });
+
+        await memberData.save();
+
+        const embed = new EmbedBuilder()
+          .setTitle('Achievement Awarded')
+          .setDescription(
+            `${user.username} has earned the achievement **${title}**!`
+          )
+          .setColor('Green');
+
+        await interaction.reply({ embeds: [embed] });
+        break;
+      }
+      case 'removeachievement': {
+        if (!guildData.levelingEnabled) {
+          return interaction.reply({
+            content: 'Leveling system is not enabled in this Server',
+          });
+        }
+
+        const user = interaction.options.getUser('user');
+        const title = interaction.options.getString('title');
+
+        const memberData = await MemberData.findOne({
+          guildId: interaction.guild.id,
+          userId: user.id,
+        });
+
+        if (!memberData) {
+          return interaction.reply({
+            content: `${user.username} has no stored profile data.`,
+            ephemeral: true,
+          });
+        }
+
+        const beforeCount = memberData.achievements.length;
+        memberData.achievements = memberData.achievements.filter(
+          (achievement) => achievement.title !== title
+        );
+
+        await memberData.save();
+
+        const removedCount = beforeCount - memberData.achievements.length;
+        const embed = new EmbedBuilder()
+          .setTitle('Achievement Removed')
+          .setDescription(
+            removedCount
+              ? `Removed **${title}** from ${user.username}.`
+              : `No achievement named **${title}** found for ${user.username}.`
+          )
+          .setColor(removedCount ? 'Orange' : 'Red');
 
         await interaction.reply({ embeds: [embed] });
         break;
