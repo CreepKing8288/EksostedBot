@@ -93,8 +93,7 @@ module.exports = {
           }
 
           return interaction.reply({
-            content: `You claimed a **${size} crate** and earned **${points} XP**!`,
-            ephemeral: true,
+            content: `${interaction.user} claimed a **${size} crate** and earned **${points} XP**!`,
           });
         }
       } catch (error) {

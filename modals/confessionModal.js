@@ -10,6 +10,26 @@ const isValidUrl = (value) => {
   }
 };
 
+const getCounterDocument = async (db) => {
+  const updateOptions = { upsert: true, returnDocument: 'after' };
+  try {
+    return await db.collection('settings').findOneAndUpdate(
+      { _id: 'counter' },
+      { $inc: { count: 1 } },
+      updateOptions
+    );
+  } catch (error) {
+    if (error.message.includes('returnDocument') || error.message.includes('returnOriginal')) {
+      return await db.collection('settings').findOneAndUpdate(
+        { _id: 'counter' },
+        { $inc: { count: 1 } },
+        { upsert: true, returnOriginal: false }
+      );
+    }
+    throw error;
+  }
+};
+
 module.exports = {
   // The "create" helper used by the /confess command
   create: () => {
@@ -44,6 +64,13 @@ module.exports = {
     const content = interaction.fields.getTextInputValue('content');
     const attachment = interaction.fields.getTextInputValue('attachment');
 
+    if (!client.db) {
+      return interaction.followUp({
+        content: 'The database is not available right now. Please try again later.',
+        ephemeral: true,
+      });
+    }
+
     // 1. Get Config & Counter
     const config = await client.db.collection('settings').findOne({ _id: 'config' });
     if (!config?.confession_channel_id || !config?.log_channel_id) {
@@ -60,13 +87,16 @@ module.exports = {
       });
     }
 
-    const counterDoc = await client.db.collection('settings').findOneAndUpdate(
-      { _id: 'counter' },
-      { $inc: { count: 1 } },
-      { upsert: true, returnDocument: 'after' }
-    );
+    if (!client.db) {
+      return interaction.followUp({
+        content: 'The database is not available right now. Please try again later.',
+        ephemeral: true,
+      });
+    }
 
-    let num = counterDoc.value?.count;
+    const counterDoc = await getCounterDocument(client.db);
+
+    let num = counterDoc?.value?.count;
     if (num == null) {
       const fallbackCounter = await client.db.collection('settings').findOne({ _id: 'counter' });
       num = fallbackCounter?.count ?? 1;

@@ -10,6 +10,26 @@ const isValidUrl = (value) => {
   }
 };
 
+const getCounterDocument = async (db) => {
+  const updateOptions = { upsert: true, returnDocument: 'after' };
+  try {
+    return await db.collection('settings').findOneAndUpdate(
+      { _id: 'counter' },
+      { $inc: { count: 1 } },
+      updateOptions
+    );
+  } catch (error) {
+    if (error.message.includes('returnDocument') || error.message.includes('returnOriginal')) {
+      return await db.collection('settings').findOneAndUpdate(
+        { _id: 'counter' },
+        { $inc: { count: 1 } },
+        { upsert: true, returnOriginal: false }
+      );
+    }
+    throw error;
+  }
+};
+
 module.exports = {
   // The "create" helper used by the /reply command or buttons
   create: (targetNum = null) => {
@@ -54,6 +74,13 @@ module.exports = {
     const targetNum = interaction.fields.getTextInputValue('confession_id');
     const attachment = interaction.fields.getTextInputValue('attachment');
 
+    if (!client.db) {
+      return interaction.followUp({
+        content: 'The database is not available right now. Please try again later.',
+        ephemeral: true,
+      });
+    }
+
     // 1. Fetch Config
     const config = await client.db.collection('settings').findOne({ _id: 'config' });
     if (!config?.confession_channel_id || !config?.log_channel_id) {
@@ -89,12 +116,15 @@ module.exports = {
     }
 
     // 4. Get Next Reply ID from counter
-    const counterDoc = await client.db.collection('settings').findOneAndUpdate(
-      { _id: 'counter' },
-      { $inc: { count: 1 } },
-      { upsert: true, returnDocument: 'after' }
-    );
-    const replyId = counterDoc.value?.count ?? 1780;
+    if (!client.db) {
+      return interaction.followUp({
+        content: 'The database is not available right now. Please try again later.',
+        ephemeral: true,
+      });
+    }
+
+    const counterDoc = await getCounterDocument(client.db);
+    const replyId = counterDoc?.value?.count ?? 1780;
 
     // 5. Send Reply to Thread
     const replyEmbed = new EmbedBuilder()
