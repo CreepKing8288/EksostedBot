@@ -51,6 +51,13 @@ module.exports = {
             ? `<#${guildSettings.levelUpChannelId}>`
             : 'Not set',
           inline: true,
+        },
+        {
+          name: 'Leaderboard Banner',
+          value: guildSettings.leaderboardBannerUrl
+            ? `[Preview](${guildSettings.leaderboardBannerUrl})`
+            : 'Not set',
+          inline: true,
         }
       );
     } else {

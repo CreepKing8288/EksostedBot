@@ -113,6 +113,23 @@ module.exports = {
     )
     .addSubcommand((subcommand) =>
       subcommand
+        .setName('setleaderboardbanner')
+        .setDescription('Set a custom leaderboard banner image')
+        .addStringOption((option) =>
+          option
+            .setName('url')
+            .setDescription('Image URL for the leaderboard banner')
+            .setRequired(false)
+        )
+        .addAttachmentOption((option) =>
+          option
+            .setName('image')
+            .setDescription('Upload an image file for the leaderboard banner')
+            .setRequired(false)
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
         .setName('toggle')
         .setDescription('Turn the level system on or off')
         .addStringOption((option) =>
@@ -329,6 +346,40 @@ module.exports = {
           .setTitle('XP Rate Set')
           .setDescription(`XP rate has been set to **${rate}**.`)
           .setColor('Aqua');
+
+        await interaction.reply({ embeds: [embed] });
+        break;
+      }
+      case 'setleaderboardbanner': {
+        const url = interaction.options.getString('url');
+        const attachment = interaction.options.getAttachment('image');
+        const bannerUrl = attachment?.url || url;
+
+        if (!bannerUrl) {
+          return interaction.reply({
+            content:
+              'Please provide a banner image URL or upload an attachment.',
+            ephemeral: true,
+          });
+        }
+
+        if (!/^https?:\/\//i.test(bannerUrl)) {
+          return interaction.reply({
+            content: 'Please provide a valid http(s) image URL.',
+            ephemeral: true,
+          });
+        }
+
+        await GuildSettings.findOneAndUpdate(
+          { guildId: interaction.guild.id },
+          { leaderboardBannerUrl: bannerUrl },
+          { upsert: true }
+        );
+
+        const embed = new EmbedBuilder()
+          .setTitle('Leaderboard Banner Set')
+          .setDescription('The leaderboard banner image has been updated.')
+          .setColor('Green');
 
         await interaction.reply({ embeds: [embed] });
         break;

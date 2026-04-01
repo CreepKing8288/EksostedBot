@@ -2,6 +2,7 @@ const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
 const { MemberData, GuildSettings } = require('../../models/Level');
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const fetch = require('node-fetch');
+const defaultBannerUrl = 'https://img.freepik.com/free-vector/golden-winners-cup_1284-18399.jpg';
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -46,11 +47,20 @@ module.exports = {
     ctx.lineWidth = 8;
     ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
 
-    // **Trophy Image**
-    const trophy = await loadImage(
-      'https://img.freepik.com/free-vector/golden-winners-cup_1284-18399.jpg'
-    ); // Replace with a valid trophy emoji image URL
-    ctx.drawImage(trophy, 30, 30, 60, 60); // Position and size
+    // **Leaderboard Banner**
+    const bannerUrl = guildData.leaderboardBannerUrl || defaultBannerUrl;
+    let bannerImage = null;
+    try {
+      bannerImage = await loadImage(bannerUrl);
+    } catch (err) {
+      console.error(`Failed to load leaderboard banner: ${bannerUrl}`, err);
+    }
+
+    if (bannerImage) {
+      ctx.drawImage(bannerImage, 0, 0, canvasWidth, 140);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.fillRect(0, 0, canvasWidth, 140);
+    }
 
     // Header
     ctx.fillStyle = '#FFFFFF';
