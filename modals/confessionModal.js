@@ -14,14 +14,14 @@ const getCounterDocument = async (db) => {
   const updateOptions = { upsert: true, returnDocument: 'after' };
   try {
     return await db.collection('settings').findOneAndUpdate(
-      { _id: 'counter' },
+      { _id: 'confession_counter' },
       { $inc: { count: 1 } },
       updateOptions
     );
   } catch (error) {
     if (error.message.includes('returnDocument') || error.message.includes('returnOriginal')) {
       return await db.collection('settings').findOneAndUpdate(
-        { _id: 'counter' },
+        { _id: 'confession_counter' },
         { $inc: { count: 1 } },
         { upsert: true, returnOriginal: false }
       );
@@ -98,7 +98,7 @@ module.exports = {
 
     let num = counterDoc?.value?.count;
     if (num == null) {
-      const fallbackCounter = await client.db.collection('settings').findOne({ _id: 'counter' });
+      const fallbackCounter = await client.db.collection('settings').findOne({ _id: 'confession_counter' });
       num = fallbackCounter?.count ?? 1;
     }
 
