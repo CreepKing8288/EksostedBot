@@ -38,16 +38,7 @@ module.exports = {
     const canvas = createCanvas(canvasWidth, canvasHeight);
     const ctx = canvas.getContext('2d');
 
-    // Background
-    ctx.fillStyle = '#1E1E2E'; // Dark background
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // **Border**
-    ctx.strokeStyle = '#FFD700'; // Gold color for border
-    ctx.lineWidth = 8;
-    ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
-
-    // **Leaderboard Banner**
+    // **Background**
     const bannerUrl = guildData.leaderboardBannerUrl || defaultBannerUrl;
     let bannerImage = null;
     if (bannerUrl) {
@@ -58,18 +49,23 @@ module.exports = {
       }
     }
 
-    const bannerHeight = 180;
     if (bannerImage) {
-      ctx.drawImage(bannerImage, 0, 0, canvasWidth, bannerHeight);
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
-      ctx.fillRect(0, 0, canvasWidth, bannerHeight);
+      ctx.drawImage(bannerImage, 0, 0, canvasWidth, canvasHeight);
     } else {
-      const gradient = ctx.createLinearGradient(0, 0, canvasWidth, bannerHeight);
+      const gradient = ctx.createLinearGradient(0, 0, canvasWidth, canvasHeight);
       gradient.addColorStop(0, '#22303c');
       gradient.addColorStop(1, '#141927');
       ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, canvasWidth, bannerHeight);
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
     }
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+    // **Border**
+    ctx.strokeStyle = '#FFD700'; // Gold color for border
+    ctx.lineWidth = 8;
+    ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
 
     // Header
     ctx.fillStyle = '#FFFFFF';
