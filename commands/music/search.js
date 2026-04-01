@@ -6,7 +6,6 @@ const {
   ActionRowBuilder,
 } = require('discord.js');
 const { formatTime } = require('../../utils/utils');
-const spotify = require('../../utils/spotify');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -67,28 +66,16 @@ module.exports = {
       }
 
       await interaction.deferReply();
+      const search = await player.search({ query, source });
 
-      let search;
-      let spotifyResults = [];
-      if (source === 'spsearch') {
-        spotifyResults = await spotify.searchSpotifyTracks(query, 10);
-        if (!spotifyResults.length) {
-          return interaction.editReply({
-            content: '❌ No results found! Try a different search term.',
-            ephemeral: true,
-          });
-        }
-      } else {
-        search = await player.search({ query, source });
-        if (!search?.tracks?.length) {
-          return interaction.editReply({
-            content: '❌ No results found! Try a different search term.',
-            ephemeral: true,
-          });
-        }
+      if (!search?.tracks?.length) {
+        return interaction.editReply({
+          content: '❌ No results found! Try a different search term.',
+          ephemeral: true,
+        });
       }
 
-      const tracks = source === 'spsearch' ? spotifyResults : search.tracks.slice(0, 10);
+      const tracks = search.tracks.slice(0, 10);
 
       const selectMenu = new StringSelectMenuBuilder()
         .setCustomId('search_select')
@@ -96,19 +83,11 @@ module.exports = {
         .addOptions(
           tracks.map((track, index) =>
             new StringSelectMenuOptionBuilder()
-              .setLabel(
-                source === 'spsearch'
-                  ? `${index + 1}. ${track.name.slice(0, 95)}`
-                  : `${index + 1}. ${track.info.title.slice(0, 95)}`
-              )
+              .setLabel(`${index + 1}. ${track.info.title.slice(0, 95)}`)
               .setDescription(
-                source === 'spsearch'
-                  ? `${track.artists.map((a) => a.name).join(', ')} • ${formatTime(track.duration_ms)}`
-                  : `By ${track.info.author} • ${formatTime(track.info.duration)}`
+                `By ${track.info.author} • ${formatTime(track.info.duration)}`
               )
-              .setValue(
-                source === 'spsearch' ? track.external_urls.spotify : track.info.uri
-              )
+              .setValue(track.info.uri)
           )
         );
 
@@ -123,19 +102,14 @@ module.exports = {
         .setDescription(
           `🔍 Found ${tracks.length} results from ${getSourceEmoji(source)} ${getSourceName(source)}\n\n` +
             tracks
-              .map((track, index) => {
-                if (source === 'spsearch') {
-                  return `**${index + 1}.** ${track.name}\n${getSourceEmoji(source)} \`${track.artists.map((a) => a.name).join(', ')}\` • ⌛ \`${formatTime(track.duration_ms)}\``;
-                }
-                return `**${index + 1}.** [${track.info.title}](${track.info.uri})\n${getSourceEmoji(source)} \`${track.info.author}\` • ⌛ \`${formatTime(track.info.duration)}\``;
-              })
+              .map(
+                (track, index) =>
+                  `**${index + 1}.** [${track.info.title}](${track.info.uri})\n` +
+                  `${getSourceEmoji(source)} \`${track.info.author}\` • ⌛ \`${formatTime(track.info.duration)}\``
+              )
               .join('\n\n')
         )
-        .setThumbnail(
-          source === 'spsearch'
-            ? tracks[0]?.album?.images?.[0]?.url
-            : tracks[0]?.info?.artworkUrl
-        )
+        .setThumbnail(tracks[0].info.artworkUrl)
         .addFields({
           name: '📝 Instructions',
           value:
@@ -159,37 +133,9 @@ module.exports = {
       });
 
       collector.on('collect', async (i) => {
-        let selectedTrack;
-        if (source === 'spsearch') {
-          const spotifyLink = spotify.parseSpotifyLink(i.values[0]);
-          if (!spotifyLink?.type || spotifyLink.type !== 'track') {
-            return i.reply({
-              content: '❌ Invalid Spotify selection. Please try again.',
-              ephemeral: true,
-            });
-          }
-
-          const spotifyTrack = await spotify.getSpotifyTrack(spotifyLink.id);
-          const trackSearch = await player.search({
-            query: spotify.buildSpotifyTrackQuery(spotifyTrack),
-            source: 'ytsearch',
-          });
-
-          if (!trackSearch?.tracks?.length) {
-            return i.reply({
-              content:
-                '❌ Could not find a playable version for that Spotify track.',
-              ephemeral: true,
-            });
-          }
-
-          selectedTrack = trackSearch.tracks[0];
-        } else {
-          selectedTrack = search.tracks.find(
-            (track) => track.info.uri === i.values[0]
-          );
-        }
-
+        const selectedTrack = search.tracks.find(
+          (track) => track.info.uri === i.values[0]
+        );
         if (!selectedTrack) {
           return i.reply({
             content: '❌ Track not found! Please try searching again.',
