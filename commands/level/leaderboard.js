@@ -2,7 +2,7 @@ const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
 const { MemberData, GuildSettings } = require('../../models/Level');
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const fetch = require('node-fetch');
-const defaultBannerUrl = 'https://img.freepik.com/free-vector/golden-winners-cup_1284-18399.jpg';
+const defaultBannerUrl = null;
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -50,29 +50,38 @@ module.exports = {
     // **Leaderboard Banner**
     const bannerUrl = guildData.leaderboardBannerUrl || defaultBannerUrl;
     let bannerImage = null;
-    try {
-      bannerImage = await loadImage(bannerUrl);
-    } catch (err) {
-      console.error(`Failed to load leaderboard banner: ${bannerUrl}`, err);
+    if (bannerUrl) {
+      try {
+        bannerImage = await loadImage(bannerUrl);
+      } catch (err) {
+        console.error(`Failed to load leaderboard banner: ${bannerUrl}`, err);
+      }
     }
 
+    const bannerHeight = 180;
     if (bannerImage) {
-      ctx.drawImage(bannerImage, 0, 0, canvasWidth, 140);
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-      ctx.fillRect(0, 0, canvasWidth, 140);
+      ctx.drawImage(bannerImage, 0, 0, canvasWidth, bannerHeight);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+      ctx.fillRect(0, 0, canvasWidth, bannerHeight);
+    } else {
+      const gradient = ctx.createLinearGradient(0, 0, canvasWidth, bannerHeight);
+      gradient.addColorStop(0, '#22303c');
+      gradient.addColorStop(1, '#141927');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvasWidth, bannerHeight);
     }
 
     // Header
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 50px Arial, sans-serif';
-    ctx.fillText('Leaderboard', 100, 80); // Adjusted to not overlap with trophy
+    ctx.font = 'bold 56px Arial, sans-serif';
+    ctx.fillText('Leaderboard', 40, 110);
 
     // Column Titles
     ctx.font = 'bold 28px Arial, sans-serif';
-    ctx.fillText('Rank', 40, 130);
-    ctx.fillText('User', 140, 130);
-    ctx.fillText('Level', 500, 130);
-    ctx.fillText('XP', 700, 130);
+    ctx.fillText('Rank', 40, 220);
+    ctx.fillText('User', 140, 220);
+    ctx.fillText('Level', 500, 220);
+    ctx.fillText('XP', 700, 220);
 
     // Draw leaderboard rows
     for (let index = 0; index < topMembers.length; index++) {
@@ -91,7 +100,7 @@ module.exports = {
         console.error(`Failed to fetch user ${member.userId}:`, err);
       }
 
-      const y = 180 + index * 50;
+      const y = 260 + index * 50;
 
       // Draw rank number
       ctx.fillStyle = '#FFFFFF';
