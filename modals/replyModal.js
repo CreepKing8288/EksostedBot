@@ -125,7 +125,11 @@ module.exports = {
     }
 
     const counterDoc = await getCounterDocument(client.db, 'reply_counter', interaction.guild.id);
-    const replyId = counterDoc?.value?.count ?? 1;
+    let replyId = counterDoc?.value?.count ?? counterDoc?.count;
+    if (replyId == null) {
+      const fallbackCounter = await client.db.collection('settings').findOne({ _id: 'reply_counter', guildId: interaction.guild.id });
+      replyId = fallbackCounter?.count ?? 1;
+    }
 
     // 5. Send Reply to Thread
     const replyEmbed = new EmbedBuilder()
