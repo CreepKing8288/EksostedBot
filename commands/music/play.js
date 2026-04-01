@@ -212,7 +212,7 @@ module.exports = {
           })
           .setTitle('Spotify Playlist Added')
           .setThumbnail(firstArtwork || client.user.displayAvatarURL())
-          .setDescription(`Added \\`${addedCount}\\` tracks from the Spotify playlist.`)
+          .setDescription(`Added \`${addedCount}\` tracks from the Spotify playlist.`)
           .addFields([
             {
               name: '🎵 Tracks Added',
