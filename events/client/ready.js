@@ -2,6 +2,7 @@ const { Events, ActivityType } = require('discord.js');
 const startGiveawayScheduler = require('../../functions/giveawayScheduler');
 const serverStatusUpdater = require('../../functions/serverStatusUpdater');
 const updateStatus = require('../../functions/statusRotation');
+const startLeaderboardScheduler = require('../../functions/leaderboardScheduler');
 const fs = require('fs');
 const path = require('path');
 const voiceStateUpdate = require('../voiceStateUpdate');
@@ -13,6 +14,7 @@ module.exports = {
     startGiveawayScheduler(client);
     serverStatusUpdater(client);
     updateStatus(client);
+    startLeaderboardScheduler(client);
     client.lavalink.init({ id: client.user.id });
     if (typeof voiceStateUpdate.initialize === 'function') {
       await voiceStateUpdate.initialize(client);

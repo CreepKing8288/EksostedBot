@@ -102,6 +102,18 @@ module.exports = {
     )
     .addSubcommand((subcommand) =>
       subcommand
+        .setName('setleaderboardchannel')
+        .setDescription('Set the channel for hourly leaderboard updates')
+        .addChannelOption((option) =>
+          option
+            .setName('channel')
+            .setDescription('The channel where hourly leaderboards will be posted')
+            .addChannelTypes(ChannelType.GuildText)
+            .setRequired(true)
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
         .setName('setxprate')
         .setDescription('Set the XP growth rate')
         .addNumberOption((option) =>
@@ -426,6 +438,30 @@ module.exports = {
           .setTitle('Leaderboard Banner Set')
           .setDescription('The leaderboard banner image has been updated.')
           .setColor('Green');
+
+        await interaction.reply({ embeds: [embed] });
+        break;
+      }
+      case 'setleaderboardchannel': {
+        if (!guildData || !guildData.levelingEnabled) {
+          return interaction.reply({
+            content: 'Leveling system is not enabled in this Server',
+          });
+        }
+
+        const channel = interaction.options.getChannel('channel');
+        await GuildSettings.findOneAndUpdate(
+          { guildId: interaction.guild.id },
+          { leaderboardChannelId: channel.id },
+          { upsert: true }
+        );
+
+        const embed = new EmbedBuilder()
+          .setTitle('Leaderboard Channel Set')
+          .setDescription(
+            `Hourly leaderboard updates will be posted to ${channel}.`
+          )
+          .setColor('Purple');
 
         await interaction.reply({ embeds: [embed] });
         break;
