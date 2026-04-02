@@ -147,21 +147,51 @@ async function postLeaderboardUpdate(client, guildId, channelId) {
 
   const attachment = await renderLevelLeaderboardImage(client, guildId, guildData);
   const voiceEmbed = await createVoiceLeaderboardEmbed(client, guildId);
+  const lastUpdate = new Date();
+  const nextUpdateText = '1 hour';
+
+  voiceEmbed.addFields(
+    { name: 'Last Update', value: `<t:${Math.floor(lastUpdate.getTime() / 1000)}:F>`, inline: false },
+    { name: 'Updating in', value: nextUpdateText, inline: false }
+  );
+  voiceEmbed.setTimestamp(lastUpdate);
 
   if (!attachment && voiceEmbed.data.description === 'No voice activity XP has been recorded yet.') {
     return;
   }
 
-  await channel.send({
-    content: '📊 Hourly leaderboard update',
-    embeds: [voiceEmbed],
-    files: attachment ? [attachment] : [],
-  });
+  let message;
+  if (guildData.leaderboardUpdateMessageId) {
+    try {
+      message = await channel.messages.fetch(guildData.leaderboardUpdateMessageId);
+    } catch {
+      message = null;
+    }
+  }
+
+  if (message) {
+    await message.edit({
+      content: '📊 Hourly leaderboard update',
+      embeds: [voiceEmbed],
+      files: attachment ? [attachment] : [],
+    });
+  } else {
+    message = await channel.send({
+      content: '📊 Hourly leaderboard update',
+      embeds: [voiceEmbed],
+      files: attachment ? [attachment] : [],
+    });
+    await GuildSettings.findOneAndUpdate(
+      { guildId },
+      { leaderboardUpdateMessageId: message.id },
+      { upsert: true }
+    );
+  }
 }
 
 function startLeaderboardScheduler(client) {
   const runAll = async () => {
-    const guildSettings = await GuildSettings.find({ leaderboardChannelId: { $ne: null } }).lean();
+    const guildSettings = await GuildSettings.find({ leaderboardChannelId: { $ne: null } });
     if (!guildSettings.length) return;
     await Promise.allSettled(
       guildSettings.map((settings) =>
