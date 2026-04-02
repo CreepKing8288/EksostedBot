@@ -99,6 +99,92 @@ async function renderLevelLeaderboardImage(client, guildId, guildData) {
   return new AttachmentBuilder(buffer, { name: 'leaderboard.png' });
 }
 
+async function renderVoiceLeaderboardImage(client, guildId, guildData) {
+  const leaderboard = await MemberData.find({ guildId, voiceXp: { $gt: 0 } })
+    .sort({ voiceXp: -1, voiceSeconds: -1 })
+    .lean();
+  if (!leaderboard.length) return null;
+
+  const topMembers = leaderboard.slice(0, 10);
+  const canvasWidth = 950;
+  const canvasHeight = 600;
+  const canvas = createCanvas(canvasWidth, canvasHeight);
+  const ctx = canvas.getContext('2d');
+
+  const bannerUrl = guildData?.leaderboardBannerUrl || defaultBannerUrl;
+  let bannerImage = null;
+  if (bannerUrl) {
+    try {
+      bannerImage = await loadImage(bannerUrl);
+    } catch (err) {
+      console.error(`Failed to load leaderboard banner: ${bannerUrl}`, err);
+    }
+  }
+
+  if (bannerImage) {
+    ctx.drawImage(bannerImage, 0, 0, canvasWidth, canvasHeight);
+  } else {
+    const gradient = ctx.createLinearGradient(0, 0, canvasWidth, canvasHeight);
+    gradient.addColorStop(0, '#22303c');
+    gradient.addColorStop(1, '#141927');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+  }
+
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+  ctx.strokeStyle = '#FFD700';
+  ctx.lineWidth = 8;
+  ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 56px Arial, sans-serif';
+  ctx.fillText('Voice Leaderboard', 40, 110);
+
+  ctx.font = 'bold 28px Arial, sans-serif';
+  ctx.fillText('Rank', 40, 220);
+  ctx.fillText('User', 140, 220);
+  ctx.fillText('VC XP', 520, 220);
+  ctx.fillText('Time', 720, 220);
+
+  for (let index = 0; index < topMembers.length; index++) {
+    const member = topMembers[index];
+    let userTag = 'Unknown User';
+    let avatarURL = 'https://cdn.discordapp.com/embed/avatars/0.png';
+
+    try {
+      const user = await client.users.fetch(member.userId);
+      if (user) {
+        userTag = user.tag;
+        avatarURL = user.displayAvatarURL({ format: 'png', size: 64 });
+      }
+    } catch (err) {
+      console.error(`Failed to fetch user ${member.userId}:`, err);
+    }
+
+    const y = 260 + index * 50;
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '24px Arial, sans-serif';
+    ctx.fillText(`#${index + 1}`, 40, y);
+
+    try {
+      const avatar = await loadImage(avatarURL);
+      ctx.drawImage(avatar, 100, y - 30, 40, 40);
+    } catch (err) {
+      console.error(`Failed to load avatar for ${member.userId}:`, err);
+    }
+
+    ctx.fillText(userTag, 160, y);
+    ctx.fillText(`${member.voiceXp}`, 520, y);
+    ctx.fillText(formatDuration(member.voiceSeconds || 0), 720, y);
+  }
+
+  const buffer = await canvas.encode('png');
+  return new AttachmentBuilder(buffer, { name: 'vcleaderboard.png' });
+}
+
 async function createVoiceLeaderboardEmbed(client, guildId) {
   const leaderboard = await MemberData.find({ guildId, voiceXp: { $gt: 0 } })
     .sort({ voiceXp: -1, voiceSeconds: -1 })
@@ -146,6 +232,7 @@ async function postLeaderboardUpdate(client, guildId, channelId) {
   if (!guildData || !guildData.levelingEnabled) return;
 
   const attachment = await renderLevelLeaderboardImage(client, guildId, guildData);
+  const voiceAttachment = await renderVoiceLeaderboardImage(client, guildId, guildData);
   const voiceEmbed = await createVoiceLeaderboardEmbed(client, guildId);
   const lastUpdate = new Date();
   const nextUpdateText = '1 hour';
@@ -156,9 +243,11 @@ async function postLeaderboardUpdate(client, guildId, channelId) {
   );
   voiceEmbed.setTimestamp(lastUpdate);
 
-  if (!attachment && voiceEmbed.data.description === 'No voice activity XP has been recorded yet.') {
+  if (!attachment && !voiceAttachment && voiceEmbed.data.description === 'No voice activity XP has been recorded yet.') {
     return;
   }
+
+  const files = [attachment, voiceAttachment].filter(Boolean);
 
   let message;
   if (guildData.leaderboardUpdateMessageId) {
@@ -173,13 +262,13 @@ async function postLeaderboardUpdate(client, guildId, channelId) {
     await message.edit({
       content: '📊 Hourly leaderboard update',
       embeds: [voiceEmbed],
-      files: attachment ? [attachment] : [],
+      files,
     });
   } else {
     message = await channel.send({
       content: '📊 Hourly leaderboard update',
       embeds: [voiceEmbed],
-      files: attachment ? [attachment] : [],
+      files,
     });
     await GuildSettings.findOneAndUpdate(
       { guildId },
