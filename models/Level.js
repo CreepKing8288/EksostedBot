@@ -6,6 +6,7 @@ const guildSettingsSchema = new mongoose.Schema({
   levelUpChannelId: { type: String, default: null },
   leaderboardChannelId: { type: String, default: null },
   leaderboardUpdateMessageId: { type: String, default: null },
+  leaderboardUpdateStyle: { type: String, default: 'image' },
   leaderboardBannerUrl: { type: String, default: null },
   levelingEnabled: { type: Boolean, default: true },
   startingXp: { type: Number, default: 1000 },

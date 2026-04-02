@@ -99,6 +99,37 @@ async function renderLevelLeaderboardImage(client, guildId, guildData) {
   return new AttachmentBuilder(buffer, { name: 'leaderboard.png' });
 }
 
+async function createLevelLeaderboardEmbed(client, guildId) {
+  const leaderboard = await MemberData.find({ guildId }).sort({ level: -1, xp: -1 }).lean();
+  if (!leaderboard.length) {
+    return new EmbedBuilder()
+      .setTitle('Level Leaderboard')
+      .setDescription('No members found in the leaderboard.')
+      .setColor('Grey')
+      .setTimestamp();
+  }
+
+  const topMembers = leaderboard.slice(0, 10);
+  const rows = await Promise.all(
+    topMembers.map(async (member, index) => {
+      let userLabel = `Unknown User (${member.userId})`;
+      try {
+        const user = await client.users.fetch(member.userId);
+        if (user) userLabel = user.tag;
+      } catch {
+        // ignore missing users
+      }
+      return `**#${index + 1}** • ${userLabel}\n• Level: **${member.level}** • XP: **${member.xp}**`;
+    })
+  );
+
+  return new EmbedBuilder()
+    .setTitle('Level Leaderboard')
+    .setDescription(rows.join('\n\n'))
+    .setColor('Gold')
+    .setTimestamp();
+}
+
 async function renderVoiceLeaderboardImage(client, guildId, guildData) {
   const leaderboard = await MemberData.find({ guildId, voiceXp: { $gt: 0 } })
     .sort({ voiceXp: -1, voiceSeconds: -1 })
@@ -231,23 +262,33 @@ async function postLeaderboardUpdate(client, guildId, channelId) {
   const guildData = await GuildSettings.findOne({ guildId });
   if (!guildData || !guildData.levelingEnabled) return;
 
+  const style = guildData.leaderboardUpdateStyle || 'image';
   const attachment = await renderLevelLeaderboardImage(client, guildId, guildData);
   const voiceAttachment = await renderVoiceLeaderboardImage(client, guildId, guildData);
+  const levelEmbed = await createLevelLeaderboardEmbed(client, guildId);
   const voiceEmbed = await createVoiceLeaderboardEmbed(client, guildId);
   const lastUpdate = new Date();
   const nextUpdateText = '1 hour';
 
-  voiceEmbed.addFields(
-    { name: 'Last Update', value: `<t:${Math.floor(lastUpdate.getTime() / 1000)}:F>`, inline: false },
-    { name: 'Updating in', value: nextUpdateText, inline: false }
-  );
-  voiceEmbed.setTimestamp(lastUpdate);
+  const updateEmbed = new EmbedBuilder()
+    .setTitle('Leaderboard Update')
+    .addFields(
+      { name: 'Last Update', value: `<t:${Math.floor(lastUpdate.getTime() / 1000)}:F>`, inline: false },
+      { name: 'Updating in', value: nextUpdateText, inline: false }
+    )
+    .setColor('Blue')
+    .setTimestamp(lastUpdate);
 
-  if (!attachment && !voiceAttachment && voiceEmbed.data.description === 'No voice activity XP has been recorded yet.') {
+  const files = [attachment, voiceAttachment].filter(Boolean);
+  const embedStyle = style === 'embed';
+
+  if (!embedStyle && !files.length) {
     return;
   }
 
-  const files = [attachment, voiceAttachment].filter(Boolean);
+  if (embedStyle && levelEmbed.data.description.startsWith('No members') && voiceEmbed.data.description.startsWith('No voice activity')) {
+    return;
+  }
 
   let message;
   if (guildData.leaderboardUpdateMessageId) {
@@ -258,18 +299,16 @@ async function postLeaderboardUpdate(client, guildId, channelId) {
     }
   }
 
+  const payload = {
+    content: '📊 Hourly leaderboard update',
+    embeds: embedStyle ? [updateEmbed, levelEmbed, voiceEmbed] : [updateEmbed],
+    files: embedStyle ? [] : files,
+  };
+
   if (message) {
-    await message.edit({
-      content: '📊 Hourly leaderboard update',
-      embeds: [voiceEmbed],
-      files,
-    });
+    await message.edit(payload);
   } else {
-    message = await channel.send({
-      content: '📊 Hourly leaderboard update',
-      embeds: [voiceEmbed],
-      files,
-    });
+    message = await channel.send(payload);
     await GuildSettings.findOneAndUpdate(
       { guildId },
       { leaderboardUpdateMessageId: message.id },

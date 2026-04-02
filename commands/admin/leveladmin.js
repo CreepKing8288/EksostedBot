@@ -114,6 +114,21 @@ module.exports = {
     )
     .addSubcommand((subcommand) =>
       subcommand
+        .setName('setleaderboardstyle')
+        .setDescription('Choose leaderboard scheduler output style')
+        .addStringOption((option) =>
+          option
+            .setName('style')
+            .setDescription('Output style for leaderboard scheduler')
+            .setRequired(true)
+            .addChoices(
+              { name: 'Image', value: 'image' },
+              { name: 'Embed', value: 'embed' }
+            )
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
         .setName('setxprate')
         .setDescription('Set the XP growth rate')
         .addNumberOption((option) =>
@@ -461,6 +476,28 @@ module.exports = {
           .setDescription(
             `Hourly leaderboard updates will be posted to ${channel}.`
           )
+          .setColor('Purple');
+
+        await interaction.reply({ embeds: [embed] });
+        break;
+      }
+      case 'setleaderboardstyle': {
+        if (!guildData || !guildData.levelingEnabled) {
+          return interaction.reply({
+            content: 'Leveling system is not enabled in this Server',
+          });
+        }
+
+        const style = interaction.options.getString('style');
+        await GuildSettings.findOneAndUpdate(
+          { guildId: interaction.guild.id },
+          { leaderboardUpdateStyle: style },
+          { upsert: true }
+        );
+
+        const embed = new EmbedBuilder()
+          .setTitle('Leaderboard Style Set')
+          .setDescription(`Hourly leaderboard updates will now use **${style}** mode.`)
           .setColor('Purple');
 
         await interaction.reply({ embeds: [embed] });
