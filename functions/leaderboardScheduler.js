@@ -262,9 +262,6 @@ async function postLeaderboardUpdate(client, guildId, channelId) {
   const guildData = await GuildSettings.findOne({ guildId });
   if (!guildData || !guildData.levelingEnabled) return;
 
-  const style = guildData.leaderboardUpdateStyle || 'image';
-  const attachment = await renderLevelLeaderboardImage(client, guildId, guildData);
-  const voiceAttachment = await renderVoiceLeaderboardImage(client, guildId, guildData);
   const levelEmbed = await createLevelLeaderboardEmbed(client, guildId);
   const voiceEmbed = await createVoiceLeaderboardEmbed(client, guildId);
   const lastUpdate = new Date();
@@ -279,42 +276,33 @@ async function postLeaderboardUpdate(client, guildId, channelId) {
     .setColor('Blue')
     .setTimestamp(lastUpdate);
 
-  const files = [attachment, voiceAttachment].filter(Boolean);
-  const embedStyle = style === 'embed';
-
-  if (!embedStyle && !files.length) {
+  if (levelEmbed.data.description.startsWith('No members') && voiceEmbed.data.description.startsWith('No voice activity')) {
     return;
   }
 
-  if (embedStyle && levelEmbed.data.description.startsWith('No members') && voiceEmbed.data.description.startsWith('No voice activity')) {
-    return;
-  }
-
-  let message;
+  let previousMessage;
   if (guildData.leaderboardUpdateMessageId) {
     try {
-      message = await channel.messages.fetch(guildData.leaderboardUpdateMessageId);
+      previousMessage = await channel.messages.fetch(guildData.leaderboardUpdateMessageId);
     } catch {
-      message = null;
+      previousMessage = null;
     }
   }
 
-  const payload = {
-    content: '📊 Hourly leaderboard update',
-    embeds: embedStyle ? [updateEmbed, levelEmbed, voiceEmbed] : [updateEmbed],
-    files: embedStyle ? [] : files,
-  };
-
-  if (message) {
-    await message.edit(payload);
-  } else {
-    message = await channel.send(payload);
-    await GuildSettings.findOneAndUpdate(
-      { guildId },
-      { leaderboardUpdateMessageId: message.id },
-      { upsert: true }
-    );
+  if (previousMessage) {
+    await previousMessage.delete().catch(() => null);
   }
+
+  const message = await channel.send({
+    content: '📊 Hourly leaderboard update',
+    embeds: [updateEmbed, levelEmbed, voiceEmbed],
+  });
+
+  await GuildSettings.findOneAndUpdate(
+    { guildId },
+    { leaderboardUpdateMessageId: message.id },
+    { upsert: true }
+  );
 }
 
 function startLeaderboardScheduler(client) {
