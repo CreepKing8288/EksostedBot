@@ -80,6 +80,56 @@ module.exports = {
             return interaction.reply({ content: 'This crate size is not configured correctly.', ephemeral: true });
           }
 
+          const defaultClaimLimits = { small: 3, medium: 2, large: 1 };
+          const maxClaims = Math.max(1, config.claimLimits?.[size] ?? defaultClaimLimits[size]);
+          if (!interaction.client.activeCrateMessages) {
+            interaction.client.activeCrateMessages = new Map();
+          }
+
+          let crateState = interaction.client.activeCrateMessages.get(interaction.message.id);
+          if (!crateState) {
+            crateState = {
+              size,
+              maxClaims,
+              claimedBy: new Set(),
+            };
+            interaction.client.activeCrateMessages.set(interaction.message.id, crateState);
+          }
+
+          if (crateState.claimedBy.has(interaction.user.id)) {
+            return interaction.reply({
+              content: 'You have already claimed this crate.',
+              ephemeral: true,
+            });
+          }
+
+          if (crateState.claimedBy.size >= crateState.maxClaims) {
+            return interaction.reply({
+              content: 'This crate has already been fully claimed.',
+              ephemeral: true,
+            });
+          }
+
+          crateState.claimedBy.add(interaction.user.id);
+
+          let row = interaction.message.components?.[0];
+          if (row) {
+            const button = ButtonBuilder.from(row.components[0]);
+            const remaining = crateState.maxClaims - crateState.claimedBy.size;
+            if (remaining <= 0) {
+              button.setDisabled(true).setLabel('Claim Crate (Full)');
+            } else {
+              button.setLabel(`Claim Crate (${remaining} left)`);
+            }
+            await interaction.message.edit({ components: [new ActionRowBuilder().addComponents(button)] });
+          }
+
+          const messageText = `${interaction.user} claimed a **${size} crate** and earned **${points} XP**!`;
+
+          if (crateState.claimedBy.size >= crateState.maxClaims) {
+            interaction.client.activeCrateMessages.delete(interaction.message.id);
+          }
+
           let memberData = await MemberData.findOne({ guildId: interaction.guild.id, userId: interaction.user.id });
           if (!memberData) {
             memberData = new MemberData({
@@ -95,16 +145,8 @@ module.exports = {
           memberData.totalXp += points;
           await memberData.save();
 
-          const row = interaction.message.components?.[0];
-          if (row) {
-            const button = ButtonBuilder.from(row.components[0]).setDisabled(true);
-            await interaction.message.edit({ components: [new ActionRowBuilder().addComponents(button)] });
-          }
-
-          await interaction.message.delete().catch(() => null);
-
           return interaction.reply({
-            content: `${interaction.user} claimed a **${size} crate** and earned **${points} XP**!`,
+            content: messageText,
           });
         }
       } catch (error) {

@@ -50,6 +50,7 @@ const client = new Client({
     GatewayIntentBits.GuildVoiceStates,
   ],
 });
+client.activeCrateMessages = new Map();
 
 client.lavalink = new LavalinkManager({
   nodes: [

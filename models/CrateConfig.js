@@ -13,6 +13,11 @@ const crateConfigSchema = new mongoose.Schema({
     medium: { type: Number, default: 25 },
     large: { type: Number, default: 50 },
   },
+  claimLimits: {
+    small: { type: Number, default: 3 },
+    medium: { type: Number, default: 2 },
+    large: { type: Number, default: 1 },
+  },
 });
 
 module.exports = mongoose.model('CrateConfig', crateConfigSchema);

@@ -28,6 +28,24 @@ module.exports = {
     )
     .addIntegerOption((option) =>
       option
+        .setName('small_claims')
+        .setDescription('How many users can claim a small crate')
+        .setMinValue(1)
+    )
+    .addIntegerOption((option) =>
+      option
+        .setName('medium_claims')
+        .setDescription('How many users can claim a medium crate')
+        .setMinValue(1)
+    )
+    .addIntegerOption((option) =>
+      option
+        .setName('large_claims')
+        .setDescription('How many users can claim a large crate')
+        .setMinValue(1)
+    )
+    .addIntegerOption((option) =>
+      option
         .setName('expiration')
         .setDescription('How long users have to claim a crate, in minutes')
         .setMinValue(1)
@@ -43,9 +61,20 @@ module.exports = {
     const autoState = interaction.options.getString('autostate');
     const minInterval = interaction.options.getInteger('min_interval');
     const maxInterval = interaction.options.getInteger('max_interval');
+    const smallClaims = interaction.options.getInteger('small_claims');
+    const mediumClaims = interaction.options.getInteger('medium_claims');
+    const largeClaims = interaction.options.getInteger('large_claims');
     const expiration = interaction.options.getInteger('expiration');
 
-    if (autoState === null && minInterval === null && maxInterval === null && expiration === null) {
+    if (
+      autoState === null &&
+      minInterval === null &&
+      maxInterval === null &&
+      smallClaims === null &&
+      mediumClaims === null &&
+      largeClaims === null &&
+      expiration === null
+    ) {
       return interaction.reply({
         content: 'Please provide at least one setting to update.',
         ephemeral: true,
@@ -67,12 +96,15 @@ module.exports = {
     if (autoState !== null) updateData.autoDropEnabled = autoState === 'on';
     if (minInterval !== null) updateData.autoMinIntervalMinutes = minInterval;
     if (maxInterval !== null) updateData.autoMaxIntervalMinutes = maxInterval;
+    if (smallClaims !== null) updateData['claimLimits.small'] = smallClaims;
+    if (mediumClaims !== null) updateData['claimLimits.medium'] = mediumClaims;
+    if (largeClaims !== null) updateData['claimLimits.large'] = largeClaims;
     if (expiration !== null) updateData.claimExpiryMinutes = expiration;
 
     const config = await CrateConfig.findOneAndUpdate(
       { guildId: interaction.guild.id },
       { $set: updateData },
-      { upsert: true, new: true }
+      { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
     const embed = new EmbedBuilder()
@@ -97,6 +129,13 @@ module.exports = {
       fields.push({
         name: 'Claim Expiration',
         value: `Users have **${config.claimExpiryMinutes}** minutes to claim a crate`,
+      });
+    }
+    if (smallClaims !== null || mediumClaims !== null || largeClaims !== null) {
+      const limits = config.claimLimits || { small: 3, medium: 2, large: 1 };
+      fields.push({
+        name: 'Claim Limits',
+        value: `Small: **${limits.small}** users\nMedium: **${limits.medium}** users\nLarge: **${limits.large}** users`,
       });
     }
 

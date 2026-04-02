@@ -80,9 +80,18 @@ module.exports = {
     }
 
     const crate = crateInfo[size] || crateInfo.small;
+    const claimLimit = Math.max(
+      1,
+      config.claimLimits?.[size] ?? { small: 3, medium: 2, large: 1 }[size]
+    );
+
+    if (!interaction.client.activeCrateMessages) {
+      interaction.client.activeCrateMessages = new Map();
+    }
+
     const embed = new EmbedBuilder()
       .setTitle(`${crate.label} Dropped!`)
-      .setDescription(`${crate.description}\n${note}`)
+      .setDescription(`${crate.description}\n${note}\n\nThis crate can be claimed by up to **${claimLimit}** users.`)
       .addFields({
         name: 'Claim Reward',
         value: `Click the button below to claim a ${crate.label} and earn XP.`,
@@ -97,6 +106,11 @@ module.exports = {
     const row = new ActionRowBuilder().addComponents(button);
 
     const message = await channel.send({ embeds: [embed], components: [row] });
+    interaction.client.activeCrateMessages.set(message.id, {
+      size,
+      maxClaims: claimLimit,
+      claimedBy: new Set(),
+    });
     await interaction.reply({ content: `Dropped a ${crate.label} in ${channel}.`, ephemeral: true });
 
     const expiryMinutes = Math.max(1, config.claimExpiryMinutes ?? 5);

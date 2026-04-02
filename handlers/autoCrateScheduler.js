@@ -89,11 +89,21 @@ module.exports = async (client) => {
 
     const size = crateSizes[randomBetween(0, crateSizes.length - 1)];
     const crate = crateInfo[size];
+    const claimLimit = Math.max(
+      1,
+      config.claimLimits?.[size] ?? { small: 3, medium: 2, large: 1 }[size]
+    );
     const expiryMinutes = Math.max(1, config.claimExpiryMinutes ?? 5);
+
+    if (!client.activeCrateMessages) {
+      client.activeCrateMessages = new Map();
+    }
 
     const embed = new EmbedBuilder()
       .setTitle(`${crate.label} Has Appeared!`)
-      .setDescription(`${crate.description}\n\nThis crate will expire in **${expiryMinutes}** minute(s).`)
+      .setDescription(
+        `${crate.description}\n\nThis crate can be claimed by up to **${claimLimit}** users. It will expire in **${expiryMinutes}** minute(s).`
+      )
       .setColor(crate.color)
       .addFields({ name: 'How to Claim', value: 'Press the button below to claim the crate before it expires.' });
 
@@ -105,6 +115,11 @@ module.exports = async (client) => {
     const row = new ActionRowBuilder().addComponents(button);
 
     const message = await channel.send({ embeds: [embed], components: [row] });
+    client.activeCrateMessages.set(message.id, {
+      size,
+      maxClaims: claimLimit,
+      claimedBy: new Set(),
+    });
 
     setTimeout(async () => {
       try {
@@ -114,6 +129,8 @@ module.exports = async (client) => {
         if (error.code !== 10008) {
           console.error('Failed to delete expired crate message:', error);
         }
+      } finally {
+        client.activeCrateMessages.delete(message.id);
       }
     }, expiryMinutes * 60_000);
   };
