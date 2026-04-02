@@ -1,5 +1,21 @@
 const { Events, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
+const isUnknownInteractionError = (error) => error?.code === 10062;
+
+const safeInteractionReply = async (interaction, payload) => {
+  try {
+    if (interaction.replied || interaction.deferred) {
+      await interaction.followUp(payload);
+    } else {
+      await interaction.reply(payload);
+    }
+  } catch (error) {
+    if (!isUnknownInteractionError(error)) {
+      console.error('Failed to send interaction reply:', error);
+    }
+  }
+};
+
 module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction) {
@@ -17,17 +33,10 @@ module.exports = {
       } catch (error) {
         console.error(error);
 
-        if (interaction.replied || interaction.deferred) {
-          await interaction.followUp({
-            content: 'There was an error while executing this command!',
-            flags: [MessageFlags.Ephemeral],
-          });
-        } else {
-          await interaction.reply({
-            content: 'There was an error while executing this command!',
-            flags: [MessageFlags.Ephemeral],
-          });
-        }
+        await safeInteractionReply(interaction, {
+          content: 'There was an error while executing this command!',
+          flags: [MessageFlags.Ephemeral],
+        });
       }
     }
 
@@ -100,11 +109,10 @@ module.exports = {
         }
       } catch (error) {
         console.error('Button interaction error:', error);
-        if (interaction.replied || interaction.deferred) {
-          await interaction.followUp({ content: 'There was an error processing your button.', flags: [MessageFlags.Ephemeral] });
-        } else {
-          await interaction.reply({ content: 'There was an error processing your button.', flags: [MessageFlags.Ephemeral] });
-        }
+        await safeInteractionReply(interaction, {
+          content: 'There was an error processing your button.',
+          flags: [MessageFlags.Ephemeral],
+        });
       }
     }
 
