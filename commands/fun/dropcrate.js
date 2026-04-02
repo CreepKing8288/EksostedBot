@@ -96,7 +96,19 @@ module.exports = {
 
     const row = new ActionRowBuilder().addComponents(button);
 
-    await channel.send({ embeds: [embed], components: [row] });
+    const message = await channel.send({ embeds: [embed], components: [row] });
     await interaction.reply({ content: `Dropped a ${crate.label} in ${channel}.`, ephemeral: true });
+
+    const expiryMinutes = Math.max(1, config.claimExpiryMinutes ?? 5);
+    setTimeout(async () => {
+      try {
+        const current = await message.fetch();
+        await current.delete();
+      } catch (error) {
+        if (error.code !== 10008) {
+          console.error('Failed to delete expired crate message:', error);
+        }
+      }
+    }, expiryMinutes * 60_000);
   },
 };

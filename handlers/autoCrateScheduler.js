@@ -109,14 +109,11 @@ module.exports = async (client) => {
     setTimeout(async () => {
       try {
         const current = await message.fetch();
-        const messageRow = current.components?.[0];
-        const currentButton = messageRow?.components?.[0];
-        if (currentButton && !currentButton.disabled) {
-          const disabledButton = ButtonBuilder.from(currentButton).setDisabled(true);
-          await current.edit({ components: [new ActionRowBuilder().addComponents(disabledButton)] });
-        }
+        await current.delete();
       } catch (error) {
-        console.error('Failed to expire crate claim button:', error);
+        if (error.code !== 10008) {
+          console.error('Failed to delete expired crate message:', error);
+        }
       }
     }, expiryMinutes * 60_000);
   };

@@ -86,11 +86,13 @@ module.exports = {
           memberData.totalXp += points;
           await memberData.save();
 
-          const row = interaction.message.components[0];
+          const row = interaction.message.components?.[0];
           if (row) {
             const button = ButtonBuilder.from(row.components[0]).setDisabled(true);
             await interaction.message.edit({ components: [new ActionRowBuilder().addComponents(button)] });
           }
+
+          await interaction.message.delete().catch(() => null);
 
           return interaction.reply({
             content: `${interaction.user} claimed a **${size} crate** and earned **${points} XP**!`,
