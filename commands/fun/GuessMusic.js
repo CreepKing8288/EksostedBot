@@ -73,6 +73,11 @@ module.exports = {
       subcommand
         .setName('skip')
         .setDescription('Skip the current song and move to the next round.')
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName('playagain')
+        .setDescription('Replay the current song snippet (3 uses per round).')
     ),
 
   async execute(interaction) {
@@ -140,6 +145,58 @@ module.exports = {
       await revealAnswer(interaction.channel, game);
       await nextRound(interaction);
       return interaction.reply({ content: '⏭️ Song skipped!', ephemeral: true });
+    }
+
+    if (subcommand === 'playagain') {
+      const game = activeGames.get(interaction.guild.id);
+      if (!game) {
+        return interaction.reply({
+          content: '❌ No active guess the music game!',
+          ephemeral: true,
+        });
+      }
+
+      if (game.answered) {
+        return interaction.reply({
+          content: '❌ This round is already over!',
+          ephemeral: true,
+        });
+      }
+
+      if (game.replaysUsed >= game.maxReplays) {
+        return interaction.reply({
+          content: '❌ No replays left for this round! (3/3 used)',
+          ephemeral: true,
+        });
+      }
+
+      game.replaysUsed++;
+      const config = difficultyConfig[game.difficulty];
+      const player = game.player;
+
+      await player.seek(0);
+      await player.setVolume(100);
+
+      const replayEmbed = new EmbedBuilder()
+        .setColor(0x1db954)
+        .setTitle('🔁 Replay!')
+        .setDescription('Playing the snippet again! Listen carefully.')
+        .setFooter({ text: `Replays left: ${game.maxReplays - game.replaysUsed}/${game.maxReplays}` })
+        .setTimestamp();
+
+      await interaction.channel.send({ embeds: [replayEmbed] });
+      await interaction.reply({ content: `✅ Playing again! (${game.replaysUsed}/${game.maxReplays} replays used)`, ephemeral: true });
+
+      setTimeout(async () => {
+        const currentGame = activeGames.get(interaction.guild.id);
+        if (!currentGame || currentGame.answered) return;
+
+        try {
+          await player.setVolume(0);
+        } catch (err) {
+          console.error('[GuessMusic] Failed to mute after replay:', err.message);
+        }
+      }, config.snippetDuration);
     }
 
     const difficulty = interaction.options.getString('difficulty');
@@ -219,6 +276,8 @@ module.exports = {
       totalRounds: rounds,
       difficulty,
       answered: false,
+      replaysUsed: 0,
+      maxReplays: 3,
     };
 
     activeGames.set(interaction.guild.id, gameData);
@@ -313,6 +372,7 @@ async function nextRound(interaction) {
   game.answered = false;
   game.hintsUsed = 0;
   game.guesses = [];
+  game.replaysUsed = 0;
 
   const config = difficultyConfig[game.difficulty];
   const client = interaction.client;
