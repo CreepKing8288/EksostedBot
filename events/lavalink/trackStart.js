@@ -48,7 +48,10 @@ module.exports = {
     const row2 = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('loop').setEmoji('🔄').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId('voldown').setEmoji('🔉').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId('volup').setEmoji('🔊').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('volup').setEmoji('🔊').setStyle(ButtonStyle.Secondary)
+    );
+
+    const row3 = new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId('volume_select')
         .setPlaceholder(`Volume: ${volume}%`)
@@ -61,7 +64,7 @@ module.exports = {
         )
     );
 
-    const message = await channel.send({ embeds: [embed], components: [row1, row2] });
+    const message = await channel.send({ embeds: [embed], components: [row1, row2, row3] });
 
     const collector = message.createMessageComponentCollector({ time: 300000 });
 
@@ -144,10 +147,12 @@ module.exports = {
       const disabledRow2 = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('loop').setEmoji('🔄').setStyle(ButtonStyle.Secondary).setDisabled(true),
         new ButtonBuilder().setCustomId('voldown').setEmoji('🔉').setStyle(ButtonStyle.Secondary).setDisabled(true),
-        new ButtonBuilder().setCustomId('volup').setEmoji('🔊').setStyle(ButtonStyle.Secondary).setDisabled(true),
+        new ButtonBuilder().setCustomId('volup').setEmoji('🔊').setStyle(ButtonStyle.Secondary).setDisabled(true)
+      );
+      const disabledRow3 = new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder().setCustomId('volume_select').setPlaceholder('Volume').setDisabled(true)
       );
-      message.edit({ components: [disabledRow1, disabledRow2] }).catch(() => {});
+      message.edit({ components: [disabledRow1, disabledRow2, disabledRow3] }).catch(() => {});
     });
   },
 };
