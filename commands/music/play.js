@@ -1,20 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { addToQueue, joinVoice, getNowPlaying, getQueueInfo } = require('../../utils/musicPlayer');
-
-let playerInstance = null;
-
-function getPlayer(client) {
-  if (!playerInstance) {
-    const { Player } = require('discord-player');
-    const { SpotifyExtractor, DefaultExtractors } = require('@discord-player/extractor');
-    playerInstance = new Player(client, {
-      ytdlOptions: { quality: 'highestaudio', highWaterMark: 1 << 25 },
-    });
-    playerInstance.extractors.register(SpotifyExtractor, {});
-    playerInstance.extractors.loadMulti(DefaultExtractors);
-  }
-  return playerInstance;
-}
+const { getPlayerInstance } = require('../../utils/musicPlayer');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -43,7 +28,7 @@ module.exports = {
 
     await interaction.deferReply();
 
-    const player = getPlayer(client);
+    const player = getPlayerInstance(client);
 
     let searchResult;
     try {
@@ -60,85 +45,73 @@ module.exports = {
       return interaction.editReply({ content: `❌ Search failed: ${err.message}`, ephemeral: true });
     }
 
-    joinVoice(interaction.guild.id, member.voice.channel);
+    try {
+      let queue = player.queues.get(interaction.guild.id);
 
-    if (searchResult.playlist) {
-      const addedTracks = [];
-      for (const track of searchResult.tracks) {
-        const streamFn = typeof track.stream === 'function' ? track.stream.bind(track) : null;
-        if (streamFn) {
-          addedTracks.push({
-            title: track.title,
-            url: track.url,
-            duration: track.durationMS || track.duration * 1000,
-            thumbnail: track.thumbnail || null,
-            artist: track.author || track.artist || 'Unknown',
-            requester: interaction.member,
-            stream: streamFn,
-          });
+      if (!queue) {
+        queue = player.queues.create(interaction.guild.id, {
+          metadata: {
+            channel: interaction.channel,
+            client: interaction.guild.members.me,
+            requestedBy: interaction.user,
+          },
+          selfDeaf: true,
+        });
+      }
+
+      if (searchResult.playlist) {
+        queue.addTrack(searchResult.tracks);
+
+        const totalDuration = searchResult.tracks.reduce((acc, t) => acc + (t.durationMS || 0), 0);
+
+        const playlistEmbed = new EmbedBuilder()
+          .setColor('#1DB954')
+          .setAuthor({ name: 'Added Playlist 🎧', iconURL: client.user.displayAvatarURL() })
+          .setTitle(searchResult.playlist.title)
+          .setURL(searchResult.playlist.url || searchResult.tracks[0].url)
+          .setThumbnail(searchResult.tracks[0].thumbnail)
+          .setDescription(`Added \`${searchResult.tracks.length}\` tracks to the queue.`)
+          .addFields(
+            { name: '⌛ Total Duration', value: `\`${formatDuration(totalDuration)}\``, inline: true },
+            { name: '🎧 Now Playing', value: queue.currentTrack ? `\`${queue.currentTrack.title}\`` : '`Starting...**', inline: true }
+          )
+          .setFooter({ text: `Requested by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() })
+          .setTimestamp();
+
+        if (!queue.isPlaying()) {
+          await queue.node.connect(member.voice.channel);
+          await queue.node.play();
         }
+
+        return interaction.editReply({ embeds: [playlistEmbed] });
+      } else {
+        const track = searchResult.tracks[0];
+        queue.addTrack(track);
+
+        const trackEmbed = new EmbedBuilder()
+          .setColor('#DDA0DD')
+          .setAuthor({ name: 'Added to Queue 🎵', iconURL: client.user.displayAvatarURL() })
+          .setTitle(track.title)
+          .setURL(track.url)
+          .setThumbnail(track.thumbnail)
+          .addFields(
+            { name: '👤 Artist', value: `\`${track.author || track.artist || 'Unknown'}\``, inline: true },
+            { name: '⌛ Duration', value: `\`${formatDuration(track.durationMS)}\``, inline: true },
+            { name: '🎧 Position in Queue', value: `\`#${queue.tracks.size}\``, inline: true }
+          )
+          .setFooter({ text: `Added by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() })
+          .setTimestamp();
+
+        if (!queue.isPlaying()) {
+          await queue.node.connect(member.voice.channel);
+          await queue.node.play();
+        }
+
+        return interaction.editReply({ embeds: [trackEmbed] });
       }
-
-      if (addedTracks.length === 0) {
-        return interaction.editReply({ content: '❌ Could not resolve any playable tracks.', ephemeral: true });
-      }
-
-      for (const track of addedTracks) {
-        addToQueue(interaction.guild.id, track, interaction.channel);
-      }
-
-      const totalDuration = addedTracks.reduce((acc, t) => acc + t.duration, 0);
-
-      const playlistEmbed = new EmbedBuilder()
-        .setColor('#1DB954')
-        .setAuthor({ name: 'Added Playlist 🎧', iconURL: client.user.displayAvatarURL() })
-        .setTitle(searchResult.playlist.title)
-        .setURL(searchResult.playlist.url || addedTracks[0].url)
-        .setThumbnail(addedTracks[0].thumbnail)
-        .setDescription(`Added \`${addedTracks.length}\` tracks to the queue.`)
-        .addFields(
-          { name: '⌛ Total Duration', value: `\`${formatDuration(totalDuration)}\``, inline: true },
-          { name: '🎧 Now Playing', value: `\`${getNowPlaying(interaction.guild.id)?.title || 'Loading...'}\``, inline: true }
-        )
-        .setFooter({ text: `Requested by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() })
-        .setTimestamp();
-
-      return interaction.editReply({ embeds: [playlistEmbed] });
-    } else {
-      const track = searchResult.tracks[0];
-      const streamFn = typeof track.stream === 'function' ? track.stream.bind(track) : null;
-
-      if (!streamFn) {
-        return interaction.editReply({ content: '❌ Could not resolve a playable stream for this track.', ephemeral: true });
-      }
-
-      addToQueue(interaction.guild.id, {
-        title: track.title,
-        url: track.url,
-        duration: track.durationMS || track.duration * 1000,
-        thumbnail: track.thumbnail || null,
-        artist: track.author || track.artist || 'Unknown',
-        requester: interaction.member,
-        stream: streamFn,
-      }, interaction.channel);
-
-      const queueInfo = getQueueInfo(interaction.guild.id);
-
-      const trackEmbed = new EmbedBuilder()
-        .setColor('#DDA0DD')
-        .setAuthor({ name: 'Added to Queue 🎵', iconURL: client.user.displayAvatarURL() })
-        .setTitle(track.title)
-        .setURL(track.url)
-        .setThumbnail(track.thumbnail)
-        .addFields(
-          { name: '👤 Artist', value: `\`${track.author || track.artist || 'Unknown'}\``, inline: true },
-          { name: '⌛ Duration', value: `\`${formatDuration(track.durationMS || track.duration * 1000)}\``, inline: true },
-          { name: '🎧 Position in Queue', value: `\`#${queueInfo.length}\``, inline: true }
-        )
-        .setFooter({ text: `Added by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() })
-        .setTimestamp();
-
-      return interaction.editReply({ embeds: [trackEmbed] });
+    } catch (err) {
+      console.error('[play] Queue error:', err.message);
+      return interaction.editReply({ content: `❌ Failed to play: ${err.message}`, ephemeral: true });
     }
   },
 };

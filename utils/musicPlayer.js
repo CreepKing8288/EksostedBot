@@ -1,11 +1,10 @@
-const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus } = require('@discordjs/voice');
+const { Player, QueueRepeatMode } = require('discord-player');
+const { SpotifyExtractor, DefaultExtractors } = require('@discord-player/extractor');
 
 let playerInstance = null;
 
-function getPlayerInstance(client) {
+function getPlayer(client) {
   if (!playerInstance) {
-    const { Player } = require('discord-player');
-    const { SpotifyExtractor, DefaultExtractors } = require('@discord-player/extractor');
     playerInstance = new Player(client, {
       ytdlOptions: { quality: 'highestaudio', highWaterMark: 1 << 25 },
     });
@@ -15,165 +14,122 @@ function getPlayerInstance(client) {
   return playerInstance;
 }
 
-const guildQueues = new Map();
-const guildPlayers = new Map();
-const guildConnections = new Map();
-const loopModes = new Map();
-
-function getQueue(guildId) {
-  if (!guildQueues.has(guildId)) {
-    guildQueues.set(guildId, []);
-  }
-  return guildQueues.get(guildId);
-}
-
-function getPlayer(guildId) {
-  if (!guildPlayers.has(guildId)) {
-    const player = createAudioPlayer();
-    player.on('stateChange', (oldState, newState) => {
-      if (newState.status === AudioPlayerStatus.Idle && oldState.status !== AudioPlayerStatus.Idle) {
-        const queue = getQueue(guildId);
-        const loopMode = loopModes.get(guildId) || 'off';
-
-        if (loopMode === 'track') {
-          const currentTrack = queue[0];
-          if (currentTrack) {
-            playTrack(guildId, currentTrack, queue.textChannel);
-            return;
-          }
-        } else if (loopMode === 'queue' && queue.length > 1) {
-          const currentTrack = queue.shift();
-          queue.push(currentTrack);
-          playNext(guildId);
-          return;
-        }
-
-        if (queue.length > 0) {
-          queue.shift();
-          if (queue.length > 0) {
-            playNext(guildId);
-          }
-        }
-      }
-    });
-    guildPlayers.set(guildId, player);
-  }
-  return guildPlayers.get(guildId);
-}
-
-function getConnection(guildId) {
-  return guildConnections.get(guildId);
-}
-
-async function playNext(guildId) {
-  const queue = getQueue(guildId);
-  const textChannel = queue.textChannel || null;
-
-  if (queue.length === 0) {
-    if (textChannel) {
-      textChannel.send('⏹️ Queue is empty. Use `/play` to add songs!').catch(() => {});
-    }
-    return;
-  }
-
-  const track = queue[0];
-  await playTrack(guildId, track, textChannel);
-}
-
-async function playTrack(guildId, track, textChannel) {
-  const player = getPlayer(guildId);
-  const connection = getConnection(guildId);
-
-  if (!connection) return;
-
-  try {
-    const stream = await track.stream;
-    const resource = createAudioResource(stream.stream, { inlineVolume: true });
-    player.play(resource);
-    connection.subscribe(player);
-  } catch (err) {
-    console.error('[Music] Playback error:', err.message);
-    if (textChannel) {
-      textChannel.send(`❌ Failed to play **${track.title}**. Skipping...`).catch(() => {});
-    }
-    const queue = getQueue(guildId);
-    queue.shift();
-    if (queue.length > 0) {
-      playNext(guildId);
-    }
-  }
-}
-
 async function addToQueue(guildId, track, textChannel) {
-  const queue = getQueue(guildId);
-  queue.textChannel = textChannel;
-  queue.push(track);
+  const player = getPlayer(textChannel.client);
+  let queue = player.queues.get(guildId);
 
-  if (queue.length === 1) {
-    await playNext(guildId);
+  if (!queue) {
+    queue = await player.queues.create(guildId, {
+      metadata: {
+        channel: textChannel,
+        client: textChannel.guild.members.me,
+        requestedBy: track.requester,
+      },
+      selfDeaf: true,
+    });
   }
-}
 
-function skipTrack(guildId) {
-  const player = guildPlayers.get(guildId);
-  if (!player) return false;
-  player.stop();
-  return true;
+  await queue.addTrack(track);
+
+  if (!queue.isPlaying()) {
+    await queue.node.connect(track.requester.voice.channel);
+    await queue.node.play();
+  }
+
+  return queue;
 }
 
 function getNowPlaying(guildId) {
-  const queue = getQueue(guildId);
-  return queue.length > 0 ? queue[0] : null;
-}
+  const player = getPlayer(global._client);
+  const queue = player.queues.get(guildId);
+  if (!queue || !queue.currentTrack) return null;
 
-function getQueueInfo(guildId) {
-  const queue = getQueue(guildId);
   return {
-    tracks: queue.filter(t => typeof t === 'object'),
-    length: queue.length,
+    title: queue.currentTrack.title,
+    url: queue.currentTrack.url,
+    duration: queue.currentTrack.durationMS,
+    thumbnail: queue.currentTrack.thumbnail,
+    artist: queue.currentTrack.author || queue.currentTrack.artist || 'Unknown',
+    requester: queue.currentTrack.requestedBy,
   };
 }
 
+function getQueueInfo(guildId) {
+  const player = getPlayer(global._client);
+  const queue = player.queues.get(guildId);
+  if (!queue) return { tracks: [], length: 0 };
+
+  const tracks = queue.tracks.map((t) => ({
+    title: t.title,
+    url: t.url,
+    duration: t.durationMS,
+    thumbnail: t.thumbnail,
+    artist: t.author || t.artist || 'Unknown',
+    requester: t.requestedBy,
+  }));
+
+  return { tracks, length: tracks.length };
+}
+
+function skipTrack(guildId) {
+  const player = getPlayer(global._client);
+  const queue = player.queues.get(guildId);
+  if (!queue) return false;
+  queue.node.skip();
+  return true;
+}
+
 function clearQueue(guildId) {
-  guildQueues.set(guildId, []);
-  const player = guildPlayers.get(guildId);
-  if (player) player.stop();
+  const player = getPlayer(global._client);
+  const queue = player.queues.get(guildId);
+  if (queue) queue.delete();
 }
 
 function joinVoice(guildId, voiceChannel) {
-  const existing = guildConnections.get(guildId);
-  if (existing) return existing;
-
-  const connection = joinVoiceChannel({
-    channelId: voiceChannel.id,
-    guildId: guildId,
-    adapterCreator: voiceChannel.guild.voiceAdapterCreator,
-  });
-
-  guildConnections.set(guildId, connection);
-  return connection;
+  const player = getPlayer(voiceChannel.client);
+  let queue = player.queues.get(guildId);
+  if (!queue) {
+    player.queues.create(guildId, {
+      metadata: { channel: voiceChannel, client: voiceChannel.guild.members.me },
+      selfDeaf: true,
+    });
+  }
+  queue = player.queues.get(guildId);
+  queue.node.connect(voiceChannel);
+  return queue;
 }
 
 function leaveVoice(guildId) {
-  const connection = guildConnections.get(guildId);
-  if (connection) {
-    connection.destroy();
-    guildConnections.delete(guildId);
-  }
-  const player = guildPlayers.get(guildId);
-  if (player) {
-    player.stop();
-    guildPlayers.delete(guildId);
-  }
-  guildQueues.delete(guildId);
+  const player = getPlayer(global._client);
+  const queue = player.queues.get(guildId);
+  if (queue) queue.delete();
 }
 
 function setLoopMode(guildId, mode) {
-  loopModes.set(guildId, mode);
+  const player = getPlayer(global._client);
+  const queue = player.queues.get(guildId);
+  if (!queue) return;
+
+  switch (mode) {
+    case 'track': queue.setRepeatMode(QueueRepeatMode.TRACK); break;
+    case 'queue': queue.setRepeatMode(QueueRepeatMode.QUEUE); break;
+    default: queue.setRepeatMode(QueueRepeatMode.OFF);
+  }
 }
 
 function getLoopMode(guildId) {
-  return loopModes.get(guildId) || 'off';
+  const player = getPlayer(global._client);
+  const queue = player.queues.get(guildId);
+  if (!queue) return 'off';
+  const mode = queue.repeatMode;
+  if (mode === QueueRepeatMode.TRACK) return 'track';
+  if (mode === QueueRepeatMode.QUEUE) return 'queue';
+  return 'off';
+}
+
+function getPlayerInstance(client) {
+  global._client = client;
+  return getPlayer(client);
 }
 
 module.exports = {
@@ -185,8 +141,6 @@ module.exports = {
   joinVoice,
   leaveVoice,
   getPlayer,
-  getConnection,
-  getQueue,
   setLoopMode,
   getLoopMode,
   getPlayerInstance,
