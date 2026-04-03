@@ -12,48 +12,12 @@ module.exports = {
         .setName('query')
         .setDescription('Song name, YouTube URL, or Spotify URL')
         .setRequired(true)
-        .setAutocomplete(true)
     ),
-
-  async autocomplete(interaction) {
-    try {
-      const query = interaction.options.getFocused();
-      if (!query.trim()) {
-        return await interaction.respond([
-          { name: 'Start typing to search...', value: 'start_typing' },
-        ]);
-      }
-
-      const results = await ytSearch(query);
-      const options = results.videos.slice(0, 25).map((v) => ({
-        name: `${v.title.slice(0, 100)} - ${v.author.name}`,
-        value: v.url,
-      }));
-
-      if (!options.length) {
-        return await interaction.respond([{ name: 'No results found', value: 'no_results' }]);
-      }
-
-      return await interaction.respond(options);
-    } catch {
-      try {
-        return await interaction.respond([{ name: 'Search error', value: 'error' }]);
-      } catch {}
-    }
-  },
 
   async execute(interaction) {
     const client = interaction.client;
     const query = interaction.options.getString('query');
     const member = interaction.member;
-
-    if (query === 'start_typing' || query === 'error') {
-      return interaction.reply({ content: '❌ Please enter a valid search term!', ephemeral: true });
-    }
-
-    if (query === 'no_results') {
-      return interaction.reply({ content: '❌ No results found! Try a different search term.', ephemeral: true });
-    }
 
     if (!member.voice.channel) {
       return interaction.reply({ content: '❌ You need to join a voice channel first!', ephemeral: true });
@@ -186,7 +150,6 @@ async function handleSpotifyTrack(interaction, client, query, member) {
 
   let trackInfo;
   try {
-    const { getSpotifyPlaylist } = require('../../utils/spotify');
     const SpotifyWebApi = require('spotify-web-api-node');
     const spotify = new SpotifyWebApi({
       clientId: process.env.SPOTIFY_CLIENT_ID,
