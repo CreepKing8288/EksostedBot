@@ -1,158 +1,275 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
-const { formatTime, createProgressBar } = require('../../utils/utils');
-
-const guildVolumes = new Map();
-
-function getVolume(player) {
-  return guildVolumes.get(player.guildId) ?? player.volume ?? 100;
-}
-
-function setVolume(player, vol) {
-  const clamped = Math.max(0, Math.min(150, vol));
-  guildVolumes.set(player.guildId, clamped);
-  player.setVolume(clamped);
-  return clamped;
-}
-
+const {
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+} = require('discord.js');
+const { formatTime } = require('../../utils/utils');
 module.exports = {
   name: 'trackStart',
-  isNodeEvent: false,
   async execute(client, player, track) {
     const channel = client.channels.cache.get(player.textChannelId);
     if (!channel) return;
 
-    const volume = getVolume(player);
+    const progressBar = createProgressBar(0, track.info.duration);
 
     const embed = new EmbedBuilder()
-      .setColor('#DDA0DD')
-      .setAuthor({ name: 'Now Playing 🎵', iconURL: client.user.displayAvatarURL() })
+      .setColor('#F0E68C')
+      .setAuthor({
+        name: 'Now Playing 🎵',
+        iconURL: client.user.displayAvatarURL(),
+      })
       .setTitle(track.info.title)
       .setURL(track.info.uri)
-      .setThumbnail(track.info.artworkUrl)
-      .addFields(
-        { name: '👤 Artist', value: `\`${track.info.author}\``, inline: true },
-        { name: '⌛ Duration', value: `\`${formatTime(track.info.duration)}\``, inline: true },
-        { name: '🔊 Volume', value: `\`${volume}%\``, inline: true }
+      .setDescription(
+        `${progressBar}\n\`${formatTime(0)} / ${formatTime(track.info.duration)}\``
       )
-      .setFooter({ text: `Requested by ${track.userData?.requester?.user?.tag || 'Unknown'}`, iconURL: track.userData?.requester?.user?.displayAvatarURL() })
-      .setTimestamp();
+      .setThumbnail(track.info.artworkUrl)
+      .addFields([
+        {
+          name: '👤 Artist',
+          value: `\`${track.info.author}\``,
+          inline: true,
+        },
+        {
+          name: '⌛ Duration',
+          value: `\`${formatTime(track.info.duration)}\``,
+          inline: true,
+        },
+        {
+          name: '🎧 Requested by',
+          value: `${track.userData?.requester || 'Unknown'}`,
+          inline: true,
+        },
+      ])
+      .setTimestamp()
+      .setFooter({
+        text: `Volume: ${player.volume}% | Loop: ${player.repeatMode}`,
+        iconURL:
+          track.userData?.requester?.displayAvatarURL() ||
+          client.user.displayAvatarURL(),
+      });
 
-    const row1 = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('pause').setEmoji('⏸️').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId('resume').setEmoji('▶️').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId('skip').setEmoji('⏭️').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId('stop').setEmoji('⏹️').setStyle(ButtonStyle.Danger),
-      new ButtonBuilder().setCustomId('shuffle').setEmoji('🔀').setStyle(ButtonStyle.Secondary)
-    );
+    const [firstRow, secondRow] = createControlButtons();
+    const controlMessage = await channel.send({
+      embeds: [embed],
+      components: [firstRow, secondRow],
+    });
 
-    const row2 = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('loop').setEmoji('🔄').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId('voldown').setEmoji('🔉').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId('volup').setEmoji('🔊').setStyle(ButtonStyle.Secondary)
-    );
+    const progressInterval = setInterval(() => {
+      if (player && !player.paused) {
+        const newProgressBar = createProgressBar(
+          player.position,
+          track.info.duration
+        );
+        embed.setDescription(
+          `${newProgressBar}\n\`${formatTime(player.position)} / ${formatTime(track.info.duration)}\``
+        );
+        controlMessage.edit({ embeds: [embed] }).catch(console.error);
+      }
+    }, 10000);
 
-    const row3 = new ActionRowBuilder().addComponents(
-      new StringSelectMenuBuilder()
-        .setCustomId('volume_select')
-        .setPlaceholder(`Volume: ${volume}%`)
-        .addOptions(
-          new StringSelectMenuOptionBuilder().setLabel('25%').setValue('25'),
-          new StringSelectMenuOptionBuilder().setLabel('50%').setValue('50'),
-          new StringSelectMenuOptionBuilder().setLabel('75%').setValue('75'),
-          new StringSelectMenuOptionBuilder().setLabel('100%').setValue('100'),
-          new StringSelectMenuOptionBuilder().setLabel('150%').setValue('150')
-        )
-    );
+    player.queue.current.userData.nowPlayingMessage = controlMessage;
 
-    const message = await channel.send({ embeds: [embed], components: [row1, row2, row3] });
+    const collector = controlMessage.createMessageComponentCollector({});
 
-    const collector = message.createMessageComponentCollector({ time: 300000 });
+    player.collector = collector;
 
-    collector.on('collect', async (i) => {
+    collector.on('collect', async (interaction) => {
       try {
-        const currentPlayer = client.lavalink.players.get(player.guildId);
-        if (!currentPlayer) return;
-
-        switch (i.customId) {
-          case 'pause':
-            await currentPlayer.pause();
-            await i.reply({ content: '⏸️ Paused', ephemeral: true });
-            break;
-          case 'resume':
-            await currentPlayer.resume();
-            await i.reply({ content: '▶️ Resumed', ephemeral: true });
-            break;
-          case 'skip':
-            if (currentPlayer.queue.tracks?.length) {
-              await currentPlayer.skip();
-              await i.reply({ content: '⏭️ Skipped', ephemeral: true });
-            } else {
-              await i.reply({ content: 'Queue is empty!', ephemeral: true });
-            }
-            break;
-          case 'stop':
-            await currentPlayer.stopPlaying();
-            await i.reply({ content: '⏹️ Stopped', ephemeral: true });
-            break;
-          case 'shuffle': {
-            if (currentPlayer.queue.tracks?.length) {
-              currentPlayer.queue.shuffle();
-              await i.reply({ content: '🔀 Queue shuffled!', ephemeral: true });
-            } else {
-              await i.reply({ content: 'Queue is empty!', ephemeral: true });
-            }
-            break;
-          }
-          case 'loop': {
-            const modes = ['off', 'track', 'queue'];
-            const current = currentPlayer.repeatMode;
-            const next = modes[(modes.indexOf(current) + 1) % modes.length];
-            currentPlayer.setRepeatMode(next);
-            const emoji = next === 'off' ? '🔁' : next === 'track' ? '🔂' : '🔁';
-            await i.reply({ content: `${emoji} Loop mode: **${next}**`, ephemeral: true });
-            break;
-          }
-          case 'voldown': {
-            const vol = getVolume(currentPlayer);
-            const newVol = setVolume(currentPlayer, vol - 10);
-            await i.reply({ content: `🔉 Volume: **${newVol}%**`, ephemeral: true });
-            break;
-          }
-          case 'volup': {
-            const vol = getVolume(currentPlayer);
-            const newVol = setVolume(currentPlayer, vol + 10);
-            await i.reply({ content: `🔊 Volume: **${newVol}%**`, ephemeral: true });
-            break;
-          }
-          case 'volume_select': {
-            const vol = parseInt(i.values[0], 10);
-            const newVol = setVolume(currentPlayer, vol);
-            await i.reply({ content: `🔊 Volume set to **${newVol}%**`, ephemeral: true });
-            break;
-          }
+        if (!player) {
+          collector.stop();
+          return;
         }
-      } catch (err) {
-        if (err.code !== 40060) console.error('Controls error:', err.message);
+
+        if (!interaction.deferred && !interaction.replied) {
+          await interaction.deferUpdate();
+        }
+
+        let footerText = '';
+
+        switch (interaction.customId) {
+          case 'previous':
+            const previous = await player.queue.shiftPrevious();
+            if (!previous) {
+              await interaction.followUp({
+                content: 'No previous track found',
+                ephemeral: true,
+              });
+              return;
+            }
+            await player.queue.add(previous);
+            await player.queue.add(player.queue.current);
+            await player.skip();
+            break;
+
+          case 'playpause':
+            if (!player.paused) {
+              await player.pause();
+              footerText = '⏸️ Paused the track';
+            } else {
+              await player.resume();
+              footerText = '▶️ Resumed the track';
+            }
+            break;
+
+          case 'skip':
+            if (!player.queue.tracks?.length) {
+              return interaction.followUp({
+                content: 'Queue is empty!',
+                ephemeral: true,
+              });
+            }
+            await player.skip();
+            break;
+
+          case 'loop':
+            const loopModes = ['off', 'track', 'queue'];
+            const currentMode = player.repeatMode;
+            const currentIndex = loopModes.indexOf(currentMode);
+            const nextIndex = (currentIndex + 1) % loopModes.length;
+            player.setRepeatMode(loopModes[nextIndex]);
+            footerText = `🔄 Loop mode set to: ${loopModes[nextIndex]}`;
+            break;
+
+          case 'stop':
+            await player.stopPlaying();
+            collector.stop();
+            break;
+
+          case 'seekforward':
+            if (player.position + 10000 > track.duration) {
+              return interaction.followUp({
+                content: `⚠️ Cannot seek beyond the track's duration.`,
+                ephemeral: true,
+              });
+            }
+            await player.seek(player.position + 10000);
+            footerText = '⏩ Skipped forward 10 seconds';
+            break;
+
+          case 'seekback':
+            if (player.position - 10000 < 0) {
+              return interaction.followUp({
+                content: '⚠️ Cannot seek before the track starts.',
+                ephemeral: true,
+              });
+            }
+            await player.seek(player.position - 10000);
+            footerText = '⏪ Skipped backward 10 seconds';
+            break;
+
+          case 'shuffle':
+            if (!player.queue.tracks?.length) {
+              return interaction.followUp({
+                content: 'Queue is empty!',
+                ephemeral: true,
+              });
+            }
+            player.queue.shuffle();
+            footerText = '🔀 Queue shuffled';
+            break;
+
+          case 'volup':
+            if (player.volume + 10 > 100) {
+              return interaction.followUp({
+                content: '⚠️ Cannot increase volume above 100',
+                ephemeral: true,
+              });
+            }
+            player.setVolume(player.volume + 10);
+            footerText = `🔊 Volume is now ${player.volume}`;
+            break;
+
+          case 'voldown':
+            if (player.volume - 10 < 0) {
+              return interaction.followUp({
+                content: '⚠️ Cannot decrease volume below 0',
+                ephemeral: true,
+              });
+            }
+            player.setVolume(player.volume - 10);
+            footerText = `🔉 Volume is now ${player.volume}`;
+            break;
+        }
+
+        if (footerText) {
+          embed.setFooter({ text: footerText });
+          await controlMessage.edit({ embeds: [embed] });
+        }
+      } catch (error) {
+        console.error('Error handling music control interaction:', error);
+        if (!interaction.replied) {
+          await interaction.followUp({
+            content: 'There was an error processing that command!',
+            ephemeral: true,
+          });
+        }
       }
     });
 
     collector.on('end', () => {
-      const disabledRow1 = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('pause').setEmoji('⏸️').setStyle(ButtonStyle.Secondary).setDisabled(true),
-        new ButtonBuilder().setCustomId('resume').setEmoji('▶️').setStyle(ButtonStyle.Secondary).setDisabled(true),
-        new ButtonBuilder().setCustomId('skip').setEmoji('⏭️').setStyle(ButtonStyle.Secondary).setDisabled(true),
-        new ButtonBuilder().setCustomId('stop').setEmoji('⏹️').setStyle(ButtonStyle.Danger).setDisabled(true),
-        new ButtonBuilder().setCustomId('shuffle').setEmoji('🔀').setStyle(ButtonStyle.Secondary).setDisabled(true)
-      );
-      const disabledRow2 = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('loop').setEmoji('🔄').setStyle(ButtonStyle.Secondary).setDisabled(true),
-        new ButtonBuilder().setCustomId('voldown').setEmoji('🔉').setStyle(ButtonStyle.Secondary).setDisabled(true),
-        new ButtonBuilder().setCustomId('volup').setEmoji('🔊').setStyle(ButtonStyle.Secondary).setDisabled(true)
-      );
-      const disabledRow3 = new ActionRowBuilder().addComponents(
-        new StringSelectMenuBuilder().setCustomId('volume_select').setPlaceholder('Volume').setDisabled(true)
-      );
-      message.edit({ components: [disabledRow1, disabledRow2, disabledRow3] }).catch(() => {});
+      clearInterval(progressInterval);
+      if (controlMessage) {
+        controlMessage.delete().catch(console.error);
+      }
     });
   },
 };
+
+function createProgressBar(current, total, length = 15) {
+  const progress = Math.round((current / total) * length);
+  const emptyProgress = length - progress;
+  const progressText = '▰'.repeat(progress);
+  const emptyProgressText = '▱'.repeat(emptyProgress);
+  return progressText + emptyProgressText;
+}
+
+function createControlButtons() {
+  return [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('previous')
+        .setEmoji('⏮️')
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId('seekback')
+        .setEmoji('⏪')
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId('playpause')
+        .setEmoji('⏯️')
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId('seekforward')
+        .setEmoji('⏩')
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId('skip')
+        .setEmoji('⏭️')
+        .setStyle(ButtonStyle.Secondary)
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('voldown')
+        .setEmoji('🔉')
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId('loop')
+        .setEmoji('🔄')
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId('stop')
+        .setEmoji('⏹️')
+        .setStyle(ButtonStyle.Danger),
+      new ButtonBuilder()
+        .setCustomId('shuffle')
+        .setEmoji('🔀')
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId('volup')
+        .setEmoji('🔊')
+        .setStyle(ButtonStyle.Secondary)
+    ),
+  ];
+}

@@ -16,11 +16,14 @@ module.exports = {
         )
     ),
   async execute(interaction) {
-    const client = interaction.client;
+    client = interaction.client;
     const player = client.lavalink.players.get(interaction.guild.id);
 
     if (!player) {
-      return interaction.reply({ content: 'Nothing is playing!', ephemeral: true });
+      return interaction.reply({
+        content: 'Nothing is playing!',
+        ephemeral: true,
+      });
     }
 
     const mode = interaction.options.getString('mode');
