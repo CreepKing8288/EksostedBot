@@ -8,11 +8,18 @@ async function getAccessToken() {
     return cachedToken;
   }
 
+  const clientId = (process.env.SPOTIFY_CLIENT_ID || '').trim();
+  const clientSecret = (process.env.SPOTIFY_CLIENT_SECRET || '').trim();
+
+  if (!clientId || !clientSecret) {
+    throw new Error('SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET must be set in .env');
+  }
+
   const response = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      Authorization: `Basic ${Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64')}`,
+      Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
     },
     body: 'grant_type=client_credentials',
   });

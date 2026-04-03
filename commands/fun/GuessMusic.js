@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus } = require('@discordjs/voice');
-const ytdl = require('@ytdl/ytdl');
+const playdl = require('play-dl');
 const ytSearch = require('yt-search');
 
 const activeGames = new Map();
@@ -190,8 +190,9 @@ module.exports = {
 
     const video = results.videos[Math.floor(Math.random() * Math.min(15, results.videos.length))];
 
-    const stream = ytdl(video.url, { filter: 'audioonly', quality: 'highestaudio', highWaterMark: 1 << 25 });
-    const resource = createAudioResource(stream, { inlineVolume: true });
+    const streamInfo = await playdl.stream(video.url);
+    const stream = streamInfo.stream;
+    const resource = createAudioResource(stream.stream, { inlineVolume: true });
     resource.volume.setVolume(1);
     player.play(resource);
 
@@ -325,8 +326,9 @@ async function nextRound(interaction) {
 
   const video = results.videos[Math.floor(Math.random() * Math.min(15, results.videos.length))];
 
-  const stream = ytdl(video.url, { filter: 'audioonly', quality: 'highestaudio', highWaterMark: 1 << 25 });
-  const resource = createAudioResource(stream, { inlineVolume: true });
+  const streamInfo = await playdl.stream(video.url);
+  const stream = streamInfo.stream;
+  const resource = createAudioResource(stream.stream, { inlineVolume: true });
   resource.volume.setVolume(1);
   game.player.play(resource);
 

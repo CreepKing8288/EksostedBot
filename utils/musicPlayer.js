@@ -1,5 +1,5 @@
-const { joinVoiceChannel, createAudioPlayer, createAudioResource, entersState, VoiceConnectionStatus, AudioPlayerStatus } = require('@discordjs/voice');
-const ytdl = require('@ytdl/ytdl');
+const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus } = require('@discordjs/voice');
+const playdl = require('play-dl');
 const { searchYouTube } = require('./spotify');
 
 const guildQueues = new Map();
@@ -58,7 +58,7 @@ async function playNext(guildId) {
 
   if (queue.length === 0) {
     if (textChannel) {
-      textChannel.send('⏹️ Queue is empty. Use `/pplay` to add songs!').catch(() => {});
+      textChannel.send('⏹️ Queue is empty. Use `/play` to add songs!').catch(() => {});
     }
     return;
   }
@@ -74,13 +74,21 @@ async function playTrack(guildId, track, textChannel) {
   if (!connection) return;
 
   try {
-    const stream = ytdl(track.url, {
-      filter: 'audioonly',
-      quality: 'highestaudio',
-      highWaterMark: 1 << 25,
-    });
+    const streamInfo = await playdl.stream(track.url);
+    const stream = streamInfo.stream;
 
-    const resource = createAudioResource(stream, { inlineVolume: true });
+    const resource = createAudioResource(stream.stream, { inlineVolume: true });
+    resource.playStream.on('error', (err) => {
+      console.error('[Music] Stream error:', err.message);
+      if (textChannel) {
+        textChannel.send(`❌ Failed to play **${track.title}**. Skipping...`).catch(() => {});
+      }
+      const queue = getQueue(guildId);
+      queue.shift();
+      if (queue.length > 0) {
+        playNext(guildId);
+      }
+    });
     player.play(resource);
     connection.subscribe(player);
   } catch (err) {
