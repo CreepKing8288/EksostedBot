@@ -32,6 +32,8 @@ module.exports = {
       });
     }
 
+    await interaction.deferReply();
+
     let player = client.lavalink.players.get(interaction.guild.id);
     if (!player) {
       player = client.lavalink.createPlayer({
@@ -42,8 +44,6 @@ module.exports = {
       });
     }
     await player.connect();
-
-    await interaction.deferReply();
 
     const isSpotifyUrl = query.startsWith('https://open.spotify.com/playlist/');
     const search = await player.search(

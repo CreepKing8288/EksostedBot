@@ -32,7 +32,7 @@ module.exports = {
     try {
       const query = interaction.options.getFocused();
       const member = interaction.member;
-      if (!member.voice.channel) {
+      if (!member?.voice?.channel) {
         return await interaction.respond([
           {
             name: '⚠️ Join a voice channel first!',
@@ -51,50 +51,61 @@ module.exports = {
 
       const source = 'spsearch';
 
-      player = interaction.client.lavalink.createPlayer({
+      const player = interaction.client.lavalink.createPlayer({
         guildId: interaction.guildId,
         textChannelId: interaction.channelId,
         voiceChannelId: interaction.member.voice.channel.id,
         selfDeaf: true,
       });
 
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Search timed out')), 2500)
+      );
+
+      let results;
       try {
-        const results = await player.search({ query, source });
-
-        if (!results?.tracks?.length) {
-          return await interaction.respond([
-            { name: 'No results found', value: 'no_results' },
-          ]);
-        }
-
-        let options = [];
-
-        if (results.loadType === 'playlist') {
-          options = [
-            {
-              name: `📑 Playlist: ${results.playlist?.title || 'Unknown'} (${results.tracks.length} tracks)`,
-              value: `${query}`,
-            },
-          ];
-        } else {
-          options = results.tracks.slice(0, 25).map((track) => ({
-            name: `${track.info.title} - ${track.info.author}`,
-            value: track.info.uri,
-          }));
-        }
-
-        return await interaction.respond(options);
+        results = await Promise.race([player.search({ query, source }), timeout]);
       } catch (searchError) {
-        console.error('Search error:', searchError);
         return await interaction.respond([
           { name: 'Error searching for tracks', value: 'error' },
         ]);
+      } finally {
+        try {
+          await player.destroy();
+        } catch (_) {}
       }
+
+      if (!results?.tracks?.length) {
+        return await interaction.respond([
+          { name: 'No results found', value: 'no_results' },
+        ]);
+      }
+
+      let options = [];
+
+      if (results.loadType === 'playlist') {
+        options = [
+          {
+            name: `📑 Playlist: ${results.playlist?.title || 'Unknown'} (${results.tracks.length} tracks)`,
+            value: `${query}`,
+          },
+        ];
+      } else {
+        options = results.tracks.slice(0, 25).map((track) => ({
+          name: `${track.info.title} - ${track.info.author}`,
+          value: track.info.uri,
+        }));
+      }
+
+      return await interaction.respond(options);
     } catch (error) {
+      if (error.code === 10062 || error.code === 40060) return;
       console.error('Autocomplete error:', error);
-      return await interaction.respond([
-        { name: 'An error occurred', value: 'error' },
-      ]);
+      try {
+        return await interaction.respond([
+          { name: 'An error occurred', value: 'error' },
+        ]);
+      } catch (_) {}
     }
   },
 
