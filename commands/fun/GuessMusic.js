@@ -1,8 +1,7 @@
-const {
-  SlashCommandBuilder,
-  EmbedBuilder,
-  PermissionFlagsBits,
-} = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus } = require('@discordjs/voice');
+const ytdl = require('@distube/ytdl-core');
+const ytSearch = require('yt-search');
 
 const activeGames = new Map();
 
@@ -10,22 +9,19 @@ const difficultyConfig = {
   easy: {
     label: 'Easy',
     snippetDuration: 15000,
-    source: 'spsearch',
-    query: 'top hits popular',
+    query: 'top hits popular songs 2024',
     emoji: '🟢',
   },
   medium: {
     label: 'Medium',
     snippetDuration: 10000,
-    source: 'spsearch',
-    query: 'popular songs',
+    query: 'popular songs hits',
     emoji: '🟡',
   },
   hard: {
     label: 'Hard',
     snippetDuration: 5000,
-    source: 'spsearch',
-    query: 'indie underground obscure',
+    query: 'indie underground obscure songs',
     emoji: '🔴',
   },
 };
@@ -60,24 +56,16 @@ module.exports = {
         )
     )
     .addSubcommand((subcommand) =>
-      subcommand
-        .setName('stop')
-        .setDescription('Stop the current guess the music game.')
+      subcommand.setName('stop').setDescription('Stop the current guess the music game.')
     )
     .addSubcommand((subcommand) =>
-      subcommand
-        .setName('hint')
-        .setDescription('Reveal a hint for the current song.')
+      subcommand.setName('hint').setDescription('Reveal a hint for the current song.')
     )
     .addSubcommand((subcommand) =>
-      subcommand
-        .setName('skip')
-        .setDescription('Skip the current song and move to the next round.')
+      subcommand.setName('skip').setDescription('Skip the current song and move to the next round.')
     )
     .addSubcommand((subcommand) =>
-      subcommand
-        .setName('playagain')
-        .setDescription('Replay the current song snippet (3 uses per round).')
+      subcommand.setName('playagain').setDescription('Replay the current song snippet (3 uses per round).')
     ),
 
   async execute(interaction) {
@@ -86,49 +74,33 @@ module.exports = {
     if (subcommand === 'stop') {
       const game = activeGames.get(interaction.guild.id);
       if (!game) {
-        return interaction.reply({
-          content: '❌ No active guess the music game!',
-          ephemeral: true,
-        });
+        return interaction.reply({ content: '❌ No active guess the music game!', ephemeral: true });
       }
-
       await stopGame(interaction.guild.id);
-
       const stopEmbed = new EmbedBuilder()
         .setColor(0xff0000)
         .setTitle('🎵 Guess the Music')
         .setDescription('The game has been stopped.')
         .setTimestamp();
-
       return interaction.reply({ embeds: [stopEmbed] });
     }
 
     if (subcommand === 'hint') {
       const game = activeGames.get(interaction.guild.id);
       if (!game) {
-        return interaction.reply({
-          content: '❌ No active guess the music game!',
-          ephemeral: true,
-        });
+        return interaction.reply({ content: '❌ No active guess the music game!', ephemeral: true });
       }
-
       if (game.hintsUsed >= game.totalHints) {
-        return interaction.reply({
-          content: '❌ No more hints available for this round!',
-          ephemeral: true,
-        });
+        return interaction.reply({ content: '❌ No more hints available for this round!', ephemeral: true });
       }
-
       game.hintsUsed++;
       const hint = game.hints[game.hintsUsed - 1];
-
       const hintEmbed = new EmbedBuilder()
         .setColor(0xffa500)
         .setTitle('🎵 Guess the Music — Hint')
         .setDescription(hint)
         .setFooter({ text: `Hint ${game.hintsUsed}/${game.totalHints}` })
         .setTimestamp();
-
       await interaction.channel.send({ embeds: [hintEmbed] });
       return interaction.reply({ content: '✅ Hint revealed!', ephemeral: true });
     }
@@ -136,12 +108,8 @@ module.exports = {
     if (subcommand === 'skip') {
       const game = activeGames.get(interaction.guild.id);
       if (!game) {
-        return interaction.reply({
-          content: '❌ No active guess the music game!',
-          ephemeral: true,
-        });
+        return interaction.reply({ content: '❌ No active guess the music game!', ephemeral: true });
       }
-
       await revealAnswer(interaction.channel, game);
       await nextRound(interaction);
       return interaction.reply({ content: '⏭️ Song skipped!', ephemeral: true });
@@ -150,32 +118,23 @@ module.exports = {
     if (subcommand === 'playagain') {
       const game = activeGames.get(interaction.guild.id);
       if (!game) {
-        return interaction.reply({
-          content: '❌ No active guess the music game!',
-          ephemeral: true,
-        });
+        return interaction.reply({ content: '❌ No active guess the music game!', ephemeral: true });
       }
-
       if (game.answered) {
-        return interaction.reply({
-          content: '❌ This round is already over!',
-          ephemeral: true,
-        });
+        return interaction.reply({ content: '❌ This round is already over!', ephemeral: true });
       }
-
       if (game.replaysUsed >= game.maxReplays) {
-        return interaction.reply({
-          content: '❌ No replays left for this round! (3/3 used)',
-          ephemeral: true,
-        });
+        return interaction.reply({ content: '❌ No replays left for this round! (3/3 used)', ephemeral: true });
       }
-
       game.replaysUsed++;
       const config = difficultyConfig[game.difficulty];
-      const player = game.player;
 
-      await player.seek(0);
-      await player.setVolume(100);
+      try {
+        game.player.unpause();
+        game.player.state.resource.volume.setVolume(1);
+      } catch (err) {
+        console.error('[GuessMusic] Failed to replay:', err.message);
+      }
 
       const replayEmbed = new EmbedBuilder()
         .setColor(0x1db954)
@@ -190,9 +149,8 @@ module.exports = {
       setTimeout(async () => {
         const currentGame = activeGames.get(interaction.guild.id);
         if (!currentGame || currentGame.answered) return;
-
         try {
-          await player.setVolume(0);
+          game.player.state.resource.volume.setVolume(0);
         } catch (err) {
           console.error('[GuessMusic] Failed to mute after replay:', err.message);
         }
@@ -205,55 +163,48 @@ module.exports = {
 
     const member = interaction.member;
     if (!member.voice.channel) {
-      return interaction.reply({
-        content: '❌ You need to join a voice channel first!',
-        ephemeral: true,
-      });
+      return interaction.reply({ content: '❌ You need to join a voice channel first!', ephemeral: true });
     }
 
     const botMember = interaction.guild.members.cache.get(interaction.client.user.id);
     if (botMember.voice.channel) {
-      return interaction.reply({
-        content: '❌ I am already in a voice channel! Stop the current game first.',
-        ephemeral: true,
-      });
+      return interaction.reply({ content: '❌ I am already in a voice channel! Stop the current game first.', ephemeral: true });
     }
 
     await interaction.deferReply();
 
-    const client = interaction.client;
-    const player = client.lavalink.createPlayer({
+    const connection = joinVoiceChannel({
+      channelId: member.voice.channel.id,
       guildId: interaction.guild.id,
-      voiceChannelId: member.voice.channel.id,
-      textChannelId: interaction.channel.id,
-      selfDeaf: true,
+      adapterCreator: member.voice.channel.guild.voiceAdapterCreator,
     });
 
-    await player.connect();
+    const player = createAudioPlayer();
+    connection.subscribe(player);
 
-    const search = await player.search({ query: config.query, source: config.source });
-
-    if (!search?.tracks?.length) {
-      await player.destroy();
-      return interaction.editReply({
-        content: '❌ No tracks found! Try again.',
-      });
+    const results = await ytSearch(config.query);
+    if (!results.videos.length) {
+      connection.destroy();
+      return interaction.editReply({ content: '❌ No tracks found! Try again.' });
     }
 
-    const track = search.tracks[Math.floor(Math.random() * Math.min(15, search.tracks.length))];
-    track.userData = { requester: interaction.member };
+    const video = results.videos[Math.floor(Math.random() * Math.min(15, results.videos.length))];
 
-    const songTitle = track.info.title;
-    const songAuthor = track.info.author;
-    const songUri = track.info.uri;
+    const stream = ytdl(video.url, { filter: 'audioonly', quality: 'highestaudio', highWaterMark: 1 << 25 });
+    const resource = createAudioResource(stream, { inlineVolume: true });
+    resource.volume.setVolume(1);
+    player.play(resource);
+
+    const songTitle = video.title;
+    const songAuthor = video.author.name;
+    const songUri = video.url;
 
     const hints = [];
     hints.push(`**Artist starts with:** \`${songAuthor.charAt(0)}${'•'.repeat(Math.max(0, songAuthor.length - 1))}\``);
-
     const words = songTitle.split(' ');
     const masked = words.map((w) => `${w.charAt(0)}${'•'.repeat(Math.max(0, w.length - 1))}`).join(' ');
     hints.push(`**Title:** \`${masked}\` (${words.length} words)`);
-    hints.push(`**Duration:** \`${Math.floor(track.info.duration / 1000)}s\` | **Platform:** ${songUri.includes('spotify') ? 'Spotify' : songUri.includes('youtube') ? 'YouTube' : 'Other'}`);
+    hints.push(`**Duration:** \`${video.seconds}s\` | **Platform:** \`YouTube\``);
 
     const normalizedTitle = songTitle.toLowerCase().replace(/[^\w\s]/g, '').trim();
     const normalizedAuthor = songAuthor.toLowerCase().replace(/[^\w\s]/g, '').trim();
@@ -269,6 +220,7 @@ module.exports = {
       hintsUsed: 0,
       totalHints: 3,
       player,
+      connection,
       startTime: Date.now(),
       guesses: [],
       scores: new Map(),
@@ -278,6 +230,7 @@ module.exports = {
       answered: false,
       replaysUsed: 0,
       maxReplays: 3,
+      videoUrl: video.url,
     };
 
     activeGames.set(interaction.guild.id, gameData);
@@ -300,25 +253,19 @@ module.exports = {
 
     await interaction.editReply({ embeds: [startEmbed] });
 
-    player.queue.add(track);
-    await player.play();
-
     setTimeout(async () => {
       const game = activeGames.get(interaction.guild.id);
       if (!game || game.answered) return;
-
       try {
-        await player.setVolume(0);
+        game.player.state.resource.volume.setVolume(0);
       } catch (err) {
         console.error('[GuessMusic] Failed to mute:', err.message);
       }
-
       const timeUpEmbed = new EmbedBuilder()
         .setColor(0xffa500)
         .setTitle('⏱️ Snippet Ended!')
         .setDescription('The preview has stopped! Keep guessing or use `/guessmusic hint` for clues.')
         .setTimestamp();
-
       await interaction.channel.send({ embeds: [timeUpEmbed] });
     }, config.snippetDuration);
   },
@@ -327,35 +274,28 @@ module.exports = {
 async function stopGame(guildId) {
   const game = activeGames.get(guildId);
   if (!game) return;
-
   activeGames.delete(guildId);
-
-  if (game.player) {
-    try {
-      await game.player.stopPlaying();
-      await game.player.destroy();
-    } catch (err) {
-      console.error('[GuessMusic] Failed to stop player:', err.message);
-    }
+  try {
+    game.player.stop();
+    game.connection.destroy();
+  } catch (err) {
+    console.error('[GuessMusic] Failed to stop player:', err.message);
   }
 }
 
 async function revealAnswer(channel, game) {
   game.answered = true;
-
   try {
-    await game.player.stopPlaying();
+    game.player.stop();
   } catch (err) {
     console.error('[GuessMusic] Failed to stop on reveal:', err.message);
   }
-
   const revealEmbed = new EmbedBuilder()
     .setColor(0x1db954)
     .setTitle('🎵 Answer Revealed')
-    .setDescription('The song has been revealed! Check the voice channel or wait for the next round.')
+    .setDescription(`**${game.songTitle}** by **${game.songAuthor}**`)
     .setFooter({ text: `Round ${game.round}/${game.totalRounds}` })
     .setTimestamp();
-
   await channel.send({ embeds: [revealEmbed] });
 }
 
@@ -375,38 +315,36 @@ async function nextRound(interaction) {
   game.replaysUsed = 0;
 
   const config = difficultyConfig[game.difficulty];
-  const client = interaction.client;
-  const player = game.player;
 
-  const search = await player.search({ query: config.query, source: config.source });
-
-  if (!search?.tracks?.length) {
+  const results = await ytSearch(config.query);
+  if (!results.videos.length) {
     await interaction.channel.send('❌ No tracks found for next round, skipping...');
     game.round--;
     return nextRound(interaction);
   }
 
-  const track = search.tracks[Math.floor(Math.random() * Math.min(15, search.tracks.length))];
-  track.userData = { requester: interaction.member };
+  const video = results.videos[Math.floor(Math.random() * Math.min(15, results.videos.length))];
 
-  const songTitle = track.info.title;
-  const songAuthor = track.info.author;
-  const songUri = track.info.uri;
+  const stream = ytdl(video.url, { filter: 'audioonly', quality: 'highestaudio', highWaterMark: 1 << 25 });
+  const resource = createAudioResource(stream, { inlineVolume: true });
+  resource.volume.setVolume(1);
+  game.player.play(resource);
+
+  const songTitle = video.title;
+  const songAuthor = video.author.name;
 
   game.songTitle = songTitle;
   game.songAuthor = songAuthor;
   game.normalizedTitle = songTitle.toLowerCase().replace(/[^\w\s]/g, '').trim();
   game.normalizedAuthor = songAuthor.toLowerCase().replace(/[^\w\s]/g, '').trim();
+  game.videoUrl = video.url;
 
   game.hints = [];
   game.hints.push(`**Artist starts with:** \`${songAuthor.charAt(0)}${'•'.repeat(Math.max(0, songAuthor.length - 1))}\``);
   const words = songTitle.split(' ');
   const masked = words.map((w) => `${w.charAt(0)}${'•'.repeat(Math.max(0, w.length - 1))}`).join(' ');
   game.hints.push(`**Title:** \`${masked}\` (${words.length} words)`);
-  game.hints.push(`**Duration:** \`${Math.floor(track.info.duration / 1000)}s\` | **Platform:** ${songUri.includes('spotify') ? 'Spotify' : songUri.includes('youtube') ? 'YouTube' : 'Other'}`);
-
-  player.queue.add(track);
-  await player.play();
+  game.hints.push(`**Duration:** \`${video.seconds}s\` | **Platform:** \`YouTube\``);
 
   const roundEmbed = new EmbedBuilder()
     .setColor(0x1db954)
@@ -420,19 +358,16 @@ async function nextRound(interaction) {
   setTimeout(async () => {
     const currentGame = activeGames.get(interaction.guild.id);
     if (!currentGame || currentGame.answered) return;
-
     try {
-      await player.setVolume(0);
+      currentGame.player.state.resource.volume.setVolume(0);
     } catch (err) {
       console.error('[GuessMusic] Failed to mute:', err.message);
     }
-
     const timeUpEmbed = new EmbedBuilder()
       .setColor(0xffa500)
       .setTitle('⏱️ Snippet Ended!')
       .setDescription('The preview has stopped! Keep guessing or use `/guessmusic hint` for clues.')
       .setTimestamp();
-
     await interaction.channel.send({ embeds: [timeUpEmbed] });
   }, config.snippetDuration);
 }
@@ -454,14 +389,11 @@ async function endGame(interaction) {
   const endEmbed = new EmbedBuilder()
     .setColor(0x1db954)
     .setTitle('🏆 Game Over!')
-    .setDescription(
-      `**Final Leaderboard**\n\n${leaderboard || 'No one scored any points!'}`
-    )
+    .setDescription(`**Final Leaderboard**\n\n${leaderboard || 'No one scored any points!'}`)
     .setFooter({ text: 'Thanks for playing!' })
     .setTimestamp();
 
   await interaction.channel.send({ embeds: [endEmbed] });
-
   await stopGame(interaction.guild.id);
 }
 

@@ -15,11 +15,9 @@ module.exports = {
     serverStatusUpdater(client);
     updateStatus(client);
     startLeaderboardScheduler(client);
-    client.lavalink.init({ id: client.user.id });
     if (typeof voiceStateUpdate.initialize === 'function') {
       await voiceStateUpdate.initialize(client);
     }
-    client.on('raw', (packet) => client.lavalink.sendRawData(packet));
     const commandFolderPath = path.join(__dirname, '../../commands');
     const categories = fs
       .readdirSync(commandFolderPath)

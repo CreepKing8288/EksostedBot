@@ -13,27 +13,7 @@ module.exports = (client) => {
       const stat = fs.lstatSync(filePath);
 
       if (stat.isDirectory()) {
-        if (file === 'lavalink') {
-          const lavalinkFiles = fs.readdirSync(filePath);
-          lavalinkFiles.forEach((lavalinkFile) => {
-            if (lavalinkFile.endsWith('.js')) {
-              const event = require(path.join(filePath, lavalinkFile));
-
-              if (event.isNodeEvent) {
-                client.lavalink.nodeManager.on(event.name, (...args) =>
-                  event.execute(client, ...args)
-                );
-              } else {
-                client.lavalink.on(event.name, (...args) =>
-                  event.execute(client, ...args)
-                );
-              }
-              count++;
-            }
-          });
-        } else {
-          loadEvents(filePath);
-        }
+        loadEvents(filePath);
       } else if (file.endsWith('.js')) {
         const event = require(filePath);
         if (event.once) {
