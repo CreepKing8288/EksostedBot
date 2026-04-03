@@ -79,8 +79,8 @@ module.exports = {
           .setTimestamp();
 
         if (!queue.isPlaying()) {
-          await queue.node.connect(member.voice.channel);
-          await queue.node.play();
+          await queue.connect(member.voice.channel);
+          await queue.play();
         }
 
         return interaction.editReply({ embeds: [playlistEmbed] });
@@ -103,8 +103,8 @@ module.exports = {
           .setTimestamp();
 
         if (!queue.isPlaying()) {
-          await queue.node.connect(member.voice.channel);
-          await queue.node.play();
+          await queue.connect(member.voice.channel);
+          await queue.play();
         }
 
         return interaction.editReply({ embeds: [trackEmbed] });
