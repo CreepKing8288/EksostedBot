@@ -12,19 +12,23 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    await interaction.deferReply();
+    let deferred = false;
+    try {
+      await interaction.deferReply();
+      deferred = true;
+    } catch {}
 
     const client = interaction.client;
     const query = interaction.options.getString('query');
     const member = interaction.member;
 
     if (!member.voice.channel) {
-      return interaction.editReply({ content: '❌ You need to join a voice channel first!' });
+      return reply(interaction, deferred, { content: '❌ You need to join a voice channel first!' });
     }
 
     const botMember = interaction.guild.members.cache.get(client.user.id);
     if (botMember.voice.channel && botMember.voice.channelId !== member.voice.channelId) {
-      return interaction.editReply({ content: '❌ You must be in the same voice channel as me!' });
+      return reply(interaction, deferred, { content: '❌ You must be in the same voice channel as me!' });
     }
 
     const { getPlayerInstance } = require('../../utils/musicPlayer');
@@ -38,11 +42,11 @@ module.exports = {
       });
 
       if (!searchResult || !searchResult.tracks || searchResult.tracks.length === 0) {
-        return interaction.editReply({ content: '❌ No results found! Try a different search term.' });
+        return reply(interaction, deferred, { content: '❌ No results found! Try a different search term.' });
       }
     } catch (err) {
       console.error('[play] Search error:', err.message);
-      return interaction.editReply({ content: `❌ Search failed: ${err.message}` });
+      return reply(interaction, deferred, { content: `❌ Search failed: ${err.message}` });
     }
 
     try {
@@ -50,18 +54,13 @@ module.exports = {
 
       if (!queue) {
         queue = player.queues.create(interaction.guild.id, {
-          metadata: {
-            channel: interaction.channel,
-            client: interaction.guild.members.me,
-            requestedBy: interaction.user,
-          },
+          metadata: { channel: interaction.channel, client: interaction.guild.members.me, requestedBy: interaction.user },
           selfDeaf: true,
         });
       }
 
       if (searchResult.playlist) {
         queue.addTrack(searchResult.tracks);
-
         const totalDuration = searchResult.tracks.reduce((acc, t) => acc + (t.durationMS || 0), 0);
 
         const playlistEmbed = new EmbedBuilder()
@@ -79,11 +78,11 @@ module.exports = {
           .setTimestamp();
 
         if (!queue.isPlaying()) {
-          await queue.connect(member.voice.channel);
-          await queue.play();
+          await safeConnect(queue, member.voice.channel);
+          await safePlay(queue);
         }
 
-        return interaction.editReply({ embeds: [playlistEmbed] });
+        return reply(interaction, deferred, { embeds: [playlistEmbed] });
       } else {
         const track = searchResult.tracks[0];
         queue.addTrack(track);
@@ -103,18 +102,35 @@ module.exports = {
           .setTimestamp();
 
         if (!queue.isPlaying()) {
-          await queue.connect(member.voice.channel);
-          await queue.play();
+          await safeConnect(queue, member.voice.channel);
+          await safePlay(queue);
         }
 
-        return interaction.editReply({ embeds: [trackEmbed] });
+        return reply(interaction, deferred, { embeds: [trackEmbed] });
       }
     } catch (err) {
       console.error('[play] Queue error:', err.message);
-      return interaction.editReply({ content: `❌ Failed to play: ${err.message}` });
+      return reply(interaction, deferred, { content: `❌ Failed to play: ${err.message}` });
     }
   },
 };
+
+function reply(interaction, deferred, payload) {
+  if (deferred) {
+    return interaction.editReply(payload).catch(() => {});
+  }
+  return interaction.reply({ ...payload, ephemeral: true }).catch(() => {});
+}
+
+async function safeConnect(queue, channel) {
+  if (queue.node?.connect) return queue.node.connect(channel);
+  if (queue.connect) return queue.connect(channel);
+}
+
+async function safePlay(queue) {
+  if (queue.node?.play) return queue.node.play();
+  if (queue.play) return queue.play();
+}
 
 function formatDuration(ms) {
   if (!ms || ms === 0) return 'Live';
