@@ -32,7 +32,12 @@ module.exports = {
       });
     }
 
-    await interaction.deferReply();
+    try {
+      await interaction.deferReply();
+    } catch (err) {
+      if (err.code === 10062) return;
+      throw err;
+    }
 
     let player = client.lavalink.players.get(interaction.guild.id);
     if (!player) {
