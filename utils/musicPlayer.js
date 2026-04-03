@@ -1,12 +1,24 @@
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus } = require('@discordjs/voice');
-const { spawn } = require('child_process');
-const { searchYouTube } = require('./spotify');
+
+let playerInstance = null;
+
+function getPlayerInstance(client) {
+  if (!playerInstance) {
+    const { Player } = require('discord-player');
+    const { SpotifyExtractor } = require('@discord-player/extractor');
+    playerInstance = new Player(client, {
+      ytdlOptions: { quality: 'highestaudio', highWaterMark: 1 << 25 },
+    });
+    playerInstance.extractors.register(SpotifyExtractor, {});
+    playerInstance.extractors.loadDefault();
+  }
+  return playerInstance;
+}
 
 const guildQueues = new Map();
 const guildPlayers = new Map();
 const guildConnections = new Map();
 const loopModes = new Map();
-const activeProcesses = new Map();
 
 function getQueue(guildId) {
   if (!guildQueues.has(guildId)) {
@@ -68,43 +80,6 @@ async function playNext(guildId) {
   await playTrack(guildId, track, textChannel);
 }
 
-function getAudioStream(url) {
-  return new Promise((resolve, reject) => {
-    const ytDlp = spawn('yt-dlp', [
-      '--no-playlist',
-      '-f', 'bestaudio/best',
-      '-o', '-',
-      '--no-part',
-      '--no-cache-dir',
-      '--console-title',
-      url,
-    ]);
-
-    ytDlp.on('error', (err) => {
-      reject(new Error(`yt-dlp not found. Install it or use a different playback method. (${err.message})`));
-    });
-
-    ytDlp.stderr.on('data', (data) => {
-      const msg = data.toString();
-      if (msg.includes('ERROR')) {
-        reject(new Error(msg.trim()));
-      }
-    });
-
-    ytDlp.stdout.on('data', () => {
-      ytDlp.stdout.removeAllListeners('data');
-      resolve(ytDlp.stdout);
-    });
-
-    setTimeout(() => {
-      if (!ytDlp.stdout.listeners('data').length) {
-        ytDlp.kill();
-        reject(new Error('yt-dlp timed out'));
-      }
-    }, 15000);
-  });
-}
-
 async function playTrack(guildId, track, textChannel) {
   const player = getPlayer(guildId);
   const connection = getConnection(guildId);
@@ -112,10 +87,8 @@ async function playTrack(guildId, track, textChannel) {
   if (!connection) return;
 
   try {
-    const stream = await getAudioStream(track.url);
-    activeProcesses.set(guildId, stream);
-
-    const resource = createAudioResource(stream, { inlineVolume: true });
+    const stream = await track.stream;
+    const resource = createAudioResource(stream.stream, { inlineVolume: true });
     player.play(resource);
     connection.subscribe(player);
   } catch (err) {
@@ -142,11 +115,6 @@ async function addToQueue(guildId, track, textChannel) {
 }
 
 function skipTrack(guildId) {
-  const proc = activeProcesses.get(guildId);
-  if (proc) {
-    proc.destroy();
-    activeProcesses.delete(guildId);
-  }
   const player = guildPlayers.get(guildId);
   if (!player) return false;
   player.stop();
@@ -167,11 +135,6 @@ function getQueueInfo(guildId) {
 }
 
 function clearQueue(guildId) {
-  const proc = activeProcesses.get(guildId);
-  if (proc) {
-    proc.destroy();
-    activeProcesses.delete(guildId);
-  }
   guildQueues.set(guildId, []);
   const player = guildPlayers.get(guildId);
   if (player) player.stop();
@@ -192,11 +155,6 @@ function joinVoice(guildId, voiceChannel) {
 }
 
 function leaveVoice(guildId) {
-  const proc = activeProcesses.get(guildId);
-  if (proc) {
-    proc.destroy();
-    activeProcesses.delete(guildId);
-  }
   const connection = guildConnections.get(guildId);
   if (connection) {
     connection.destroy();
@@ -231,4 +189,5 @@ module.exports = {
   getQueue,
   setLoopMode,
   getLoopMode,
+  getPlayerInstance,
 };
