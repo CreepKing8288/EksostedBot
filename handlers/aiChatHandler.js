@@ -8,6 +8,7 @@ const groq = new Groq({
 const quietCheckIntervals = new Map();
 const channelLastMessageTime = new Map();
 const channelConversationHistory = new Map();
+const processedMessages = new Set();
 
 const randomTopics = [
   "What's the most interesting game you've played recently?",
@@ -108,7 +109,12 @@ async function startQuietCheck(client, config) {
   quietCheckIntervals.set(config.guildId, interval);
 }
 
+let initialized = false;
+
 module.exports = async (client) => {
+  if (initialized) return;
+  initialized = true;
+
   if (!process.env.GROQ_API_KEY) {
     console.log('[AIChat] GROQ_API_KEY not set, AI chat disabled.');
     return;
@@ -120,17 +126,23 @@ module.exports = async (client) => {
     const config = await AIChatConfig.findOne({ guildId: message.guildId, enabled: true });
     if (!config || !config.channels.includes(message.channelId)) return;
 
+    if (processedMessages.has(message.id)) return;
+    processedMessages.add(message.id);
+    setTimeout(() => processedMessages.delete(message.id), 30000);
+
     channelLastMessageTime.set(message.channelId, Date.now());
 
     const mentionPattern = new RegExp(`^<@!?${client.user.id}>\\s*`);
-    const isMentioned = message.content.match(mentionPattern);
+    const isMentioned = mentionPattern.test(message.content);
 
     if (!isMentioned) return;
 
     const content = message.content.replace(mentionPattern, '').trim();
     if (!content) return;
 
-    await message.channel.sendTyping().catch(() => {});
+    try {
+      await message.channel.sendTyping();
+    } catch {}
 
     addMessageToHistory(message.channelId, 'user', `${message.author.username}: ${content}`);
 
@@ -141,7 +153,9 @@ module.exports = async (client) => {
       await message.reply(response);
     } catch (err) {
       console.error('[AIChat] Groq error:', err.message);
-      await message.reply('Sorry, I had a bit of trouble thinking about that. Try again?').catch(() => {});
+      try {
+        await message.reply('Sorry, I had a bit of trouble thinking about that. Try again?');
+      } catch {}
     }
   });
 
@@ -151,6 +165,13 @@ module.exports = async (client) => {
       startQuietCheck(client, config);
     }
   });
+
+  if (client.isReady()) {
+    const configs = await AIChatConfig.find({ enabled: true });
+    for (const config of configs) {
+      startQuietCheck(client, config);
+    }
+  }
 
   console.log(global.styles.successColor('✅ AI Chat handler loaded'));
 };

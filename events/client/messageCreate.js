@@ -9,6 +9,10 @@ module.exports = {
     const mention = new RegExp(`^<@!?${message.client.user.id}>( |)$`);
 
     if (message.content.match(mention)) {
+      const AIChatConfig = require('../../models/AIChatConfig');
+      const config = await AIChatConfig.findOne({ guildId: message.guildId, enabled: true });
+      if (config && config.channels.includes(message.channelId)) return;
+
       try {
         const commands = await message.client.application.commands.fetch();
 

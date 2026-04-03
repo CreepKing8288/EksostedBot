@@ -50,10 +50,20 @@ module.exports = {
     }
     await player.connect();
 
-    const isSpotifyUrl = query.startsWith('https://open.spotify.com/playlist/');
+    const isSpotifyUrl = query.startsWith('https://open.spotify.com/');
     const search = await player.search(
-      { query, source: isSpotifyUrl ? undefined : 'spsearch' }
-    );
+      { query: isSpotifyUrl ? query : `spsearch:${query}` }
+    ).catch((err) => {
+      console.error('[pplay] Search error:', err.message);
+      return null;
+    });
+
+    if (!search) {
+      return interaction.editReply({
+        content: '❌ Failed to search. Make sure your Lavalink server has Spotify support enabled (LavaSrc plugin).',
+        ephemeral: true,
+      });
+    }
 
     if (!search?.tracks?.length) {
       return interaction.editReply({
