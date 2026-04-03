@@ -5,12 +5,12 @@ let playerInstance = null;
 function getPlayerInstance(client) {
   if (!playerInstance) {
     const { Player } = require('discord-player');
-    const { SpotifyExtractor } = require('@discord-player/extractor');
+    const { SpotifyExtractor, DefaultExtractors } = require('@discord-player/extractor');
     playerInstance = new Player(client, {
       ytdlOptions: { quality: 'highestaudio', highWaterMark: 1 << 25 },
     });
     playerInstance.extractors.register(SpotifyExtractor, {});
-    playerInstance.extractors.loadDefault();
+    playerInstance.extractors.loadMulti(DefaultExtractors);
   }
   return playerInstance;
 }
