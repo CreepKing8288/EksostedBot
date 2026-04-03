@@ -145,7 +145,7 @@ module.exports = {
       });
     }
 
-    const { leaveVoice, getNowPlaying, getConnection } = require('../../utils/musicPlayer');
+    const { leaveVoice, getNowPlaying, getConnection } = require('../utils/musicPlayer');
 
     if (!newActive && activeVoiceTimers.has(key)) {
       activeVoiceTimers.delete(key);
