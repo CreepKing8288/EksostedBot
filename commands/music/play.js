@@ -1,111 +1,44 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { formatTime } = require('../../utils/utils');
-
-const autocompleteMap = new Map();
+const ytSearch = require('yt-search');
+const { getSpotifyPlaylist, searchYouTube } = require('../../utils/spotify');
+const { addToQueue, joinVoice, getNowPlaying, getQueueInfo } = require('../../utils/musicPlayer');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('play')
-    .setDescription('Play a song or playlist from different Sources')
-
+    .setDescription('Play a song, Spotify track/playlist, or add to queue.')
     .addStringOption((option) =>
       option
         .setName('query')
-        .setDescription('Song name or URL')
+        .setDescription('Song name, YouTube URL, or Spotify URL')
         .setRequired(true)
         .setAutocomplete(true)
-    )
-    .addStringOption((option) =>
-      option
-        .setName('source')
-        .setDescription('The source you want to play the music from')
-        .addChoices(
-          { name: 'Youtube', value: 'ytsearch' },
-          { name: 'Youtube Music', value: 'ytmsearch' },
-          { name: 'Spotify', value: 'spsearch' },
-          { name: 'Soundcloud', value: 'scsearch' },
-          { name: 'Deezer', value: 'dzsearch' }
-        )
     ),
 
   async autocomplete(interaction) {
     try {
       const query = interaction.options.getFocused();
-      const member = interaction.member;
-      if (!member?.voice?.channel) {
-        return await interaction.respond([
-          {
-            name: '⚠️ Join a voice channel first!',
-            value: 'join_vc',
-          },
-        ]);
-      }
       if (!query.trim()) {
         return await interaction.respond([
-          {
-            name: 'Start typing to search for songs...',
-            value: 'start_typing',
-          },
+          { name: 'Start typing to search...', value: 'start_typing' },
         ]);
       }
 
-      const source = 'spsearch';
+      const results = await ytSearch(query);
+      const options = results.videos.slice(0, 25).map((v) => ({
+        name: `${v.title.slice(0, 100)} - ${v.author.name}`,
+        value: v.url,
+      }));
 
-      const player = interaction.client.lavalink.createPlayer({
-        guildId: interaction.guildId,
-        textChannelId: interaction.channelId,
-        voiceChannelId: interaction.member.voice.channel.id,
-        selfDeaf: true,
-      });
-
-      const timeout = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Search timed out')), 2500)
-      );
-
-      let results;
-      try {
-        results = await Promise.race([player.search({ query, source }), timeout]);
-      } catch (searchError) {
-        return await interaction.respond([
-          { name: 'Error searching for tracks', value: 'error' },
-        ]);
-      } finally {
-        try {
-          await player.destroy();
-        } catch (_) {}
-      }
-
-      if (!results?.tracks?.length) {
-        return await interaction.respond([
-          { name: 'No results found', value: 'no_results' },
-        ]);
-      }
-
-      let options = [];
-
-      if (results.loadType === 'playlist') {
-        options = [
-          {
-            name: `📑 Playlist: ${results.playlist?.title || 'Unknown'} (${results.tracks.length} tracks)`,
-            value: `${query}`,
-          },
-        ];
-      } else {
-        options = results.tracks.slice(0, 25).map((track) => ({
-          name: `${track.info.title} - ${track.info.author}`,
-          value: track.info.uri,
-        }));
+      if (!options.length) {
+        return await interaction.respond([{ name: 'No results found', value: 'no_results' }]);
       }
 
       return await interaction.respond(options);
-    } catch (error) {
-      if (error.code === 10062 || error.code === 40060) return;
-      console.error('Autocomplete error:', error);
+    } catch {
       try {
-        return await interaction.respond([
-          { name: 'An error occurred', value: 'error' },
-        ]);
-      } catch (_) {}
+        return await interaction.respond([{ name: 'Search error', value: 'error' }]);
+      } catch {}
     }
   },
 
@@ -113,141 +46,207 @@ module.exports = {
     const client = interaction.client;
     const query = interaction.options.getString('query');
     const member = interaction.member;
-    const source = interaction.options.getString('source') || 'spsearch';
 
-    if (query === 'join_vc' || query === 'start_typing' || query === 'error') {
-      return interaction.reply({
-        content: '❌ Please join a voice channel and select a valid song!',
-        ephemeral: true,
-      });
+    if (query === 'start_typing' || query === 'error') {
+      return interaction.reply({ content: '❌ Please enter a valid search term!', ephemeral: true });
     }
 
     if (query === 'no_results') {
-      return interaction.reply({
-        content: '❌ No results found! Try a different search term.',
-        ephemeral: true,
-      });
+      return interaction.reply({ content: '❌ No results found! Try a different search term.', ephemeral: true });
     }
 
     if (!member.voice.channel) {
-      return interaction.reply({
-        content: '❌ You need to join a voice channel first!',
-        ephemeral: true,
-      });
+      return interaction.reply({ content: '❌ You need to join a voice channel first!', ephemeral: true });
     }
 
-    let player = client.lavalink.players.get(interaction.guild.id);
-    if (!player) {
-      player = client.lavalink.createPlayer({
-        guildId: interaction.guild.id,
-        voiceChannelId: member.voice.channel.id,
-        textChannelId: interaction.channel.id,
-        selfDeaf: true,
-      });
+    const botMember = interaction.guild.members.cache.get(client.user.id);
+    if (botMember.voice.channel && botMember.voice.channelId !== member.voice.channelId) {
+      return interaction.reply({ content: '❌ You must be in the same voice channel as me!', ephemeral: true });
     }
-    await player.connect();
 
     await interaction.deferReply();
 
-    if (query.startsWith('playlist_')) {
-      const actualQuery = query.replace('playlist_', '');
-      search = await player.search({ query: actualQuery, source });
-    } else {
-      const isURL = query.startsWith('http://') || query.startsWith('https://');
-      search = await player.search({ query, source });
+    if (query.startsWith('https://open.spotify.com/playlist/')) {
+      return await handleSpotifyPlaylist(interaction, client, query, member);
     }
 
-    if (!search?.tracks?.length) {
-      return interaction.editReply({
-        content: '❌ No results found! Try a different search term.',
-        ephemeral: true,
-      });
+    if (query.startsWith('https://open.spotify.com/track/')) {
+      return await handleSpotifyTrack(interaction, client, query, member);
     }
 
-    if (search.loadType === 'playlist') {
-      for (const track of search.tracks) {
-        track.userData = { requester: interaction.member };
-        await player.queue.add(track);
+    let searchResult;
+    try {
+      const r = await ytSearch(query);
+      if (r.videos.length) {
+        searchResult = {
+          title: r.videos[0].title,
+          url: r.videos[0].url,
+          duration: r.videos[0].seconds * 1000,
+          thumbnail: r.videos[0].thumbnail,
+          author: r.videos[0].author.name,
+        };
       }
-
-      const playlistEmbed = new EmbedBuilder()
-        .setColor('#DDA0DD')
-        .setAuthor({
-          name: 'Added Playlist to Queue 📃',
-          iconURL: client.user.displayAvatarURL(),
-        })
-        .setTitle(search.playlist?.title)
-        .setThumbnail(search.tracks[0].info.artworkUrl)
-        .setDescription(
-          `Added \`${search.tracks.length}\` tracks from playlist\n\n` +
-            `**First Track:** [${search.tracks[0].info.title}](${search.tracks[0].info.uri})\n` +
-            `**Last Track:** [${search.tracks[search.tracks.length - 1].info.title}](${search.tracks[search.tracks.length - 1].info.uri})`
-        )
-        .addFields([
-          {
-            name: '👤 Playlist Author',
-            value: `\`${search.tracks[0].info.author}\``,
-            inline: true,
-          },
-          {
-            name: '⌛ Total Duration',
-            value: `\`${formatTime(search.tracks.reduce((acc, track) => acc + track.info.duration, 0))}\``,
-            inline: true,
-          },
-        ])
-        .setFooter({
-          text: `Added by ${interaction.user.tag} • Queue position: #${player.queue.tracks.length - search.tracks.length + 1}`,
-          iconURL: interaction.user.displayAvatarURL(),
-        })
-        .setTimestamp();
-
-      if (!player.playing) {
-        await player.play();
-      }
-
-      return interaction.editReply({ embeds: [playlistEmbed] });
-    } else {
-      const track = search.tracks[0];
-      track.userData = { requester: interaction.member };
-      await player.queue.add(track);
-
-      const trackEmbed = new EmbedBuilder()
-        .setColor('#DDA0DD')
-        .setAuthor({
-          name: 'Added to Queue 🎵',
-          iconURL: client.user.displayAvatarURL(),
-        })
-        .setTitle(track.info.title)
-        .setURL(track.info.uri)
-        .setThumbnail(track.info.artworkUrl)
-        .addFields([
-          {
-            name: '👤 Artist',
-            value: `\`${track.info.author}\``,
-            inline: true,
-          },
-          {
-            name: '⌛ Duration',
-            value: `\`${formatTime(track.info.duration)}\``,
-            inline: true,
-          },
-          {
-            name: '🎧 Position in Queue',
-            value: `\`#${player.queue.tracks.length}\``,
-            inline: true,
-          },
-        ])
-        .setFooter({
-          text: `Added by ${interaction.user.tag}`,
-          iconURL: interaction.user.displayAvatarURL(),
-        })
-        .setTimestamp();
-
-      if (!player.playing) {
-        await player.play();
-      }
-
-      return interaction.editReply({ embeds: [trackEmbed] });
+    } catch {
+      searchResult = null;
     }
+
+    if (!searchResult) {
+      return interaction.editReply({ content: '❌ No results found! Try a different search term.', ephemeral: true });
+    }
+
+    joinVoice(interaction.guild.id, member.voice.channel);
+    addToQueue(interaction.guild.id, { ...searchResult, requester: interaction.member }, interaction.channel);
+
+    const queueInfo = getQueueInfo(interaction.guild.id);
+
+    const trackEmbed = new EmbedBuilder()
+      .setColor('#DDA0DD')
+      .setAuthor({ name: 'Added to Queue 🎵', iconURL: client.user.displayAvatarURL() })
+      .setTitle(searchResult.title)
+      .setURL(searchResult.url)
+      .setThumbnail(searchResult.thumbnail)
+      .addFields(
+        { name: '👤 Artist', value: `\`${searchResult.author}\``, inline: true },
+        { name: '⌛ Duration', value: `\`${formatDuration(searchResult.duration)}\``, inline: true },
+        { name: '🎧 Position in Queue', value: `\`#${queueInfo.length}\``, inline: true }
+      )
+      .setFooter({ text: `Added by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() })
+      .setTimestamp();
+
+    return interaction.editReply({ embeds: [trackEmbed] });
   },
 };
+
+async function handleSpotifyPlaylist(interaction, client, query, member) {
+  let playlist;
+  try {
+    playlist = await getSpotifyPlaylist(query);
+  } catch (err) {
+    console.error('[play] Spotify error:', err.message);
+    return interaction.editReply({ content: '❌ Failed to fetch the playlist. Make sure the URL is valid and the playlist is public.', ephemeral: true });
+  }
+
+  if (!playlist.tracks.length) {
+    return interaction.editReply({ content: '❌ This playlist is empty.', ephemeral: true });
+  }
+
+  joinVoice(interaction.guild.id, member.voice.channel);
+
+  const statusMsg = await interaction.editReply({ content: `🔍 Resolving ${playlist.tracks.length} tracks from Spotify...` });
+
+  const addedTracks = [];
+  for (let i = 0; i < playlist.tracks.length; i++) {
+    const track = playlist.tracks[i];
+    const ytResult = await searchYouTube(`${track.title} - ${track.artist}`);
+    if (ytResult) {
+      addedTracks.push({
+        title: track.title,
+        artist: track.artist,
+        url: ytResult.url,
+        duration: ytResult.duration,
+        thumbnail: track.thumbnail || ytResult.thumbnail,
+        requester: interaction.member,
+      });
+      if ((i + 1) % 5 === 0) {
+        await statusMsg.edit({ content: `🔍 Resolved ${i + 1}/${playlist.tracks.length} tracks...` }).catch(() => {});
+      }
+    }
+  }
+
+  if (!addedTracks.length) {
+    return interaction.editReply({ content: '❌ Could not find any of the playlist tracks on YouTube.', ephemeral: true });
+  }
+
+  for (const track of addedTracks) {
+    addToQueue(interaction.guild.id, track, interaction.channel);
+  }
+
+  const totalDuration = addedTracks.reduce((acc, t) => acc + t.duration, 0);
+
+  const playlistEmbed = new EmbedBuilder()
+    .setColor('#1DB954')
+    .setAuthor({ name: 'Added Spotify Playlist 🎧', iconURL: client.user.displayAvatarURL() })
+    .setTitle(playlist.name)
+    .setURL(playlist.uri)
+    .setThumbnail(playlist.thumbnail || addedTracks[0].thumbnail)
+    .setDescription(`Added \`${addedTracks.length}\` tracks to the queue.`)
+    .addFields(
+      { name: '👤 Author', value: `\`${playlist.owner}\``, inline: true },
+      { name: '⌛ Total Duration', value: `\`${formatDuration(totalDuration)}\``, inline: true },
+      { name: '🎧 Now Playing', value: `\`${getNowPlaying(interaction.guild.id)?.title || 'Loading...'}\``, inline: true }
+    )
+    .setFooter({ text: `Requested by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() })
+    .setTimestamp();
+
+  return interaction.editReply({ embeds: [playlistEmbed] });
+}
+
+async function handleSpotifyTrack(interaction, client, query, member) {
+  const trackId = query.split('/').pop().split('?')[0];
+
+  let trackInfo;
+  try {
+    const { getSpotifyPlaylist } = require('../../utils/spotify');
+    const SpotifyWebApi = require('spotify-web-api-node');
+    const spotify = new SpotifyWebApi({
+      clientId: process.env.SPOTIFY_CLIENT_ID,
+      clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+    });
+
+    const data = await spotify.clientCredentialsGrant();
+    spotify.setAccessToken(data.body.access_token);
+
+    const result = await spotify.getTrack(trackId);
+    trackInfo = {
+      title: result.body.name,
+      artist: result.body.artists.map(a => a.name).join(', '),
+      thumbnail: result.body.album.images[0]?.url || null,
+    };
+  } catch (err) {
+    console.error('[play] Spotify track error:', err.message);
+    return interaction.editReply({ content: '❌ Failed to fetch the Spotify track. Make sure the URL is valid.', ephemeral: true });
+  }
+
+  const ytResult = await searchYouTube(`${trackInfo.title} - ${trackInfo.artist}`);
+  if (!ytResult) {
+    return interaction.editReply({ content: '❌ Could not find this track on YouTube.', ephemeral: true });
+  }
+
+  joinVoice(interaction.guild.id, member.voice.channel);
+  addToQueue(interaction.guild.id, {
+    title: trackInfo.title,
+    artist: trackInfo.artist,
+    url: ytResult.url,
+    duration: ytResult.duration,
+    thumbnail: trackInfo.thumbnail || ytResult.thumbnail,
+    requester: interaction.member,
+  }, interaction.channel);
+
+  const queueInfo = getQueueInfo(interaction.guild.id);
+
+  const trackEmbed = new EmbedBuilder()
+    .setColor('#1DB954')
+    .setAuthor({ name: 'Added Spotify Track 🎵', iconURL: client.user.displayAvatarURL() })
+    .setTitle(trackInfo.title)
+    .setURL(query)
+    .setThumbnail(trackInfo.thumbnail || ytResult.thumbnail)
+    .addFields(
+      { name: '👤 Artist', value: `\`${trackInfo.artist}\``, inline: true },
+      { name: '⌛ Duration', value: `\`${formatDuration(ytResult.duration)}\``, inline: true },
+      { name: '🎧 Position in Queue', value: `\`#${queueInfo.length}\``, inline: true }
+    )
+    .setFooter({ text: `Added by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() })
+    .setTimestamp();
+
+  return interaction.editReply({ embeds: [trackEmbed] });
+}
+
+function formatDuration(ms) {
+  if (!ms || ms === 0) return 'Live';
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}

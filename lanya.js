@@ -11,11 +11,9 @@ app.listen(port, () => {
 });
 const dotenv = require('dotenv');
 const { Client, GatewayIntentBits } = require('discord.js');
-const { LavalinkManager } = require('lavalink-client');
 const fs = require('fs');
 const path = require('path');
 const chalk = require('chalk');
-const { autoPlayFunction } = require('./functions/autoPlay');
 
 const defaultEnvPath = path.join(__dirname, '.env');
 const explicitEnvFile = process.env.ENV_FILE ? path.join(__dirname, process.env.ENV_FILE) : null;
@@ -51,30 +49,6 @@ const client = new Client({
   ],
 });
 client.activeCrateMessages = new Map();
-
-client.lavalink = new LavalinkManager({
-  nodes: [
-    {
-      authorization: process.env.LL_PASSWORD,
-      host: process.env.LL_HOST,
-      port: parseInt(process.env.LL_PORT, 10),
-      id: process.env.LL_NAME,
-    },
-  ],
-  sendToShard: (guildId, payload) =>
-    client.guilds.cache.get(guildId)?.shard?.send(payload),
-  autoSkip: true,
-  client: {
-    id: process.env.DISCORD_CLIENT_ID,
-    username: 'Lanya',
-  },
-  playerOptions: {
-    onEmptyQueue: {
-      destroyAfterMs: 30_000,
-      autoPlayFunction: autoPlayFunction,
-    },
-  },
-});
 
 const styles = {
   successColor: chalk.bold.green,
