@@ -68,6 +68,8 @@ module.exports = {
         }
 
         if (interaction.customId.startsWith('claimcrate_')) {
+          try { await interaction.deferReply({ ephemeral: true }); } catch { return; }
+
           const size = interaction.customId.replace('claimcrate_', '');
           const CrateConfig = require('../../models/CrateConfig');
           const { MemberData } = require('../../models/Level');
@@ -157,7 +159,7 @@ module.exports = {
 
           await memberData.save();
 
-          return interaction.reply({
+          return interaction.editReply({
             content: messageText,
           });
         }
