@@ -146,25 +146,10 @@ async function handleSpotifyPlaylist(interaction, client, query, member) {
 }
 
 async function handleSpotifyTrack(interaction, client, query, member) {
-  const trackId = query.split('/').pop().split('?')[0];
-
   let trackInfo;
   try {
-    const SpotifyWebApi = require('spotify-web-api-node');
-    const spotify = new SpotifyWebApi({
-      clientId: process.env.SPOTIFY_CLIENT_ID,
-      clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
-    });
-
-    const data = await spotify.clientCredentialsGrant();
-    spotify.setAccessToken(data.body.access_token);
-
-    const result = await spotify.getTrack(trackId);
-    trackInfo = {
-      title: result.body.name,
-      artist: result.body.artists.map(a => a.name).join(', '),
-      thumbnail: result.body.album.images[0]?.url || null,
-    };
+    const { getSpotifyTrack } = require('../../utils/spotify');
+    trackInfo = await getSpotifyTrack(query);
   } catch (err) {
     console.error('[play] Spotify track error:', err.message);
     return interaction.editReply({ content: '❌ Failed to fetch the Spotify track. Make sure the URL is valid.', ephemeral: true });

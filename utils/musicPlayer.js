@@ -1,5 +1,5 @@
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, entersState, VoiceConnectionStatus, AudioPlayerStatus } = require('@discordjs/voice');
-const ytdl = require('@distube/ytdl-core');
+const ytdl = require('@ytdl/ytdl');
 const { searchYouTube } = require('./spotify');
 
 const guildQueues = new Map();
