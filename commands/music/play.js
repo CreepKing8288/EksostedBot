@@ -63,27 +63,39 @@ module.exports = {
     joinVoice(interaction.guild.id, member.voice.channel);
 
     if (searchResult.playlist) {
+      const addedTracks = [];
       for (const track of searchResult.tracks) {
-        addToQueue(interaction.guild.id, {
-          title: track.title,
-          url: track.url,
-          duration: track.durationMS || track.duration * 1000,
-          thumbnail: track.thumbnail || null,
-          artist: track.author || track.artist || 'Unknown',
-          requester: interaction.member,
-          stream: track.stream.bind(track),
-        }, interaction.channel);
+        const streamFn = typeof track.stream === 'function' ? track.stream.bind(track) : null;
+        if (streamFn) {
+          addedTracks.push({
+            title: track.title,
+            url: track.url,
+            duration: track.durationMS || track.duration * 1000,
+            thumbnail: track.thumbnail || null,
+            artist: track.author || track.artist || 'Unknown',
+            requester: interaction.member,
+            stream: streamFn,
+          });
+        }
       }
 
-      const totalDuration = searchResult.tracks.reduce((acc, t) => acc + (t.durationMS || t.duration * 1000 || 0), 0);
+      if (addedTracks.length === 0) {
+        return interaction.editReply({ content: '❌ Could not resolve any playable tracks.', ephemeral: true });
+      }
+
+      for (const track of addedTracks) {
+        addToQueue(interaction.guild.id, track, interaction.channel);
+      }
+
+      const totalDuration = addedTracks.reduce((acc, t) => acc + t.duration, 0);
 
       const playlistEmbed = new EmbedBuilder()
         .setColor('#1DB954')
         .setAuthor({ name: 'Added Playlist 🎧', iconURL: client.user.displayAvatarURL() })
         .setTitle(searchResult.playlist.title)
-        .setURL(searchResult.playlist.url || searchResult.tracks[0].url)
-        .setThumbnail(searchResult.tracks[0].thumbnail)
-        .setDescription(`Added \`${searchResult.tracks.length}\` tracks to the queue.`)
+        .setURL(searchResult.playlist.url || addedTracks[0].url)
+        .setThumbnail(addedTracks[0].thumbnail)
+        .setDescription(`Added \`${addedTracks.length}\` tracks to the queue.`)
         .addFields(
           { name: '⌛ Total Duration', value: `\`${formatDuration(totalDuration)}\``, inline: true },
           { name: '🎧 Now Playing', value: `\`${getNowPlaying(interaction.guild.id)?.title || 'Loading...'}\``, inline: true }
@@ -94,6 +106,12 @@ module.exports = {
       return interaction.editReply({ embeds: [playlistEmbed] });
     } else {
       const track = searchResult.tracks[0];
+      const streamFn = typeof track.stream === 'function' ? track.stream.bind(track) : null;
+
+      if (!streamFn) {
+        return interaction.editReply({ content: '❌ Could not resolve a playable stream for this track.', ephemeral: true });
+      }
+
       addToQueue(interaction.guild.id, {
         title: track.title,
         url: track.url,
@@ -101,7 +119,7 @@ module.exports = {
         thumbnail: track.thumbnail || null,
         artist: track.author || track.artist || 'Unknown',
         requester: interaction.member,
-        stream: track.stream.bind(track),
+        stream: streamFn,
       }, interaction.channel);
 
       const queueInfo = getQueueInfo(interaction.guild.id);
