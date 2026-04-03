@@ -17,7 +17,7 @@ module.exports = {
     const embed = new EmbedBuilder()
       .setTitle('🔹 Invite Link')
       .setDescription(
-        'Click the button below to invite the bot to your server!'
+        'Click the button below to invite the bot to your server! \n-# smade with ❤️ by Elle & Orweee'
       )
       .setColor('#3498db')
       .setTimestamp();
