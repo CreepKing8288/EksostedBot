@@ -2,7 +2,7 @@ const { Events, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle } = r
 const { GuildSettings } = require('../../models/Level');
 const levelUpEvent = require('../levelUp');
 
-const isUnknownInteractionError = (error) => error?.code === 10062;
+const isUnknownInteractionError = (error) => error?.code === 10062 || error?.code === 40060 || error?.code === 10008;
 
 const safeInteractionReply = async (interaction, payload) => {
   try {
