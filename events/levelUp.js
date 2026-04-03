@@ -4,6 +4,11 @@ const { GuildSettings, MemberData, LevelRoles } = require('../models/Level');
 const cooldowns = new Map();
 const messageTimestamps = new Map();
 
+const calculateXpNeeded = (level, guildData) => {
+  if (level === 1) return guildData.startingXp || 100;
+  return (guildData.startingXp || 100) + (level - 1) * (guildData.xpPerLevel || 50);
+};
+
 module.exports = {
   name: Events.MessageCreate,
 
@@ -44,47 +49,51 @@ module.exports = {
     memberData.xp += xpToAdd;
     memberData.totalXp += xpToAdd;
 
-    const calculateXpNeeded = (level) => {
-      if (level === 1) return guildData.startingXp || 100;
-      return (
-        (guildData.startingXp || 100) +
-        (level - 1) * (guildData.xpPerLevel || 50)
-      );
-    };
+    await module.exports.processLevelUp(memberData, guildData, message);
 
-    let previousLevel = memberData.level;
+    await memberData.save();
+  },
+
+  async processLevelUp(memberData, guildData, message = null) {
+    const currentTime = Date.now();
+    const previousLevel = memberData.level;
     let levelUpCount = 0;
 
-    while (memberData.xp >= calculateXpNeeded(memberData.level)) {
-      memberData.xp -= calculateXpNeeded(memberData.level);
-      memberData.level++;
-      levelUpCount++;
+    while (memberData.xp >= calculateXpNeeded(memberData.level, guildData)) {
+      memberData.xp -= calculateXpNeeded(memberData.level, guildData);
+      memberData.level += 1;
+      levelUpCount += 1;
     }
 
     if (levelUpCount > 0) {
-      const cooldownTime = 5000;
-      const userId = message.author.id;
+      const isTextMessage = message && message.channel && typeof message.channel.send === 'function';
+      if (isTextMessage) {
+        const cooldownTime = 5000;
+        const userId = message.author?.id;
 
-      if (
-        !cooldowns.has(userId) ||
-        currentTime - cooldowns.get(userId) > cooldownTime
-      ) {
-        cooldowns.set(userId, currentTime);
-        await module.exports.notifyLevelUp(
-          message,
-          memberData.level,
-          guildData
-        );
+        if (
+          userId &&
+          (!cooldowns.has(userId) || currentTime - cooldowns.get(userId) > cooldownTime)
+        ) {
+          cooldowns.set(userId, currentTime);
+          await module.exports.notifyLevelUp(
+            message,
+            memberData.level,
+            guildData
+          );
+        }
       }
 
-      await module.exports.assignRoles(
-        message,
-        previousLevel + 1,
-        memberData.level
-      );
+      if (message && message.guild && message.author?.id) {
+        await module.exports.assignRoles(
+          message,
+          previousLevel + 1,
+          memberData.level
+        );
+      }
     }
 
-    await memberData.save();
+    return levelUpCount;
   },
 
   notifyLevelUp: async (message, level, guildData) => {

@@ -6,6 +6,7 @@ const {
   ButtonBuilder,
 } = require('discord.js');
 const Fuse = require('fuse.js');
+const { name } = require('../../events/levelUp');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -44,6 +45,7 @@ module.exports = {
     // Custom category display names and emojis
     const categoryMap = {
       admin: { name: 'Administration', emoji: '⚙️' },
+      confession: { name: 'Confessions', emoji: '🫢' },
       fun: { name: 'Fun & Games', emoji: '🎉' },
       level: { name: 'Leaderboard', emoji: '🎮' },
       music: { name: 'Music', emoji: '🎵' },

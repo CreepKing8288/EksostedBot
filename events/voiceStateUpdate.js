@@ -55,25 +55,13 @@ const awardVoiceXp = async (guild, memberId, durationMs, allowPartial = false) =
   memberData.voiceXp = (memberData.voiceXp || 0) + xpToAdd;
   memberData.voiceSeconds = (memberData.voiceSeconds || 0) + durationSeconds;
 
-  let previousLevel = memberData.level;
-  while (memberData.xp >= calculateXpNeeded(memberData.level, guildData)) {
-    memberData.xp -= calculateXpNeeded(memberData.level, guildData);
-    memberData.level += 1;
-  }
+  await levelUpEvent.processLevelUp(memberData, guildData, {
+    guild,
+    author: { id: memberId },
+    channel: null,
+  });
 
   await memberData.save();
-
-  if (memberData.level > previousLevel) {
-    try {
-      await levelUpEvent.assignRoles(
-        { guild, author: { id: memberId } },
-        previousLevel + 1,
-        memberData.level
-      );
-    } catch (err) {
-      console.error('Error assigning roles after voice XP:', err);
-    }
-  }
 };
 
 const startVoiceTicker = (client) => {

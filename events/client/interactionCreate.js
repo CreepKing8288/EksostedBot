@@ -1,4 +1,6 @@
 const { Events, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { GuildSettings } = require('../../models/Level');
+const levelUpEvent = require('../levelUp');
 
 const isUnknownInteractionError = (error) => error?.code === 10062;
 
@@ -143,6 +145,16 @@ module.exports = {
 
           memberData.xp += points;
           memberData.totalXp += points;
+
+          const guildData = await GuildSettings.findOne({ guildId: interaction.guild.id });
+          if (guildData && guildData.levelingEnabled) {
+            await levelUpEvent.processLevelUp(memberData, guildData, {
+              guild: interaction.guild,
+              author: { id: interaction.user.id },
+              channel: interaction.channel,
+            });
+          }
+
           await memberData.save();
 
           return interaction.reply({
