@@ -1,8 +1,8 @@
-const { OpenAI } = require('openai');
+const Groq = require('groq-sdk');
 const AIChatConfig = require('../models/AIChatConfig');
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
 });
 
 const quietCheckIntervals = new Map();
@@ -40,8 +40,8 @@ If someone asks a question, answer it naturally. If the conversation is casual, 
 }
 
 async function getOpenAIResponse(messages, config) {
-  const completion = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+  const completion = await groq.chat.completions.create({
+    model: 'llama-3.3-70b-versatile',
     messages: [
       { role: 'system', content: getSystemPrompt(config) },
       ...messages,
@@ -109,8 +109,8 @@ async function startQuietCheck(client, config) {
 }
 
 module.exports = async (client) => {
-  if (!process.env.OPENAI_API_KEY) {
-    console.log('[AIChat] OPENAI_API_KEY not set, AI chat disabled.');
+  if (!process.env.GROQ_API_KEY) {
+    console.log('[AIChat] GROQ_API_KEY not set, AI chat disabled.');
     return;
   }
 
@@ -140,7 +140,7 @@ module.exports = async (client) => {
       addMessageToHistory(message.channelId, 'assistant', response);
       await message.reply(response);
     } catch (err) {
-      console.error('[AIChat] OpenAI error:', err.message);
+      console.error('[AIChat] Groq error:', err.message);
       await message.reply('Sorry, I had a bit of trouble thinking about that. Try again?').catch(() => {});
     }
   });
