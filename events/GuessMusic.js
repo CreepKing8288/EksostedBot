@@ -39,9 +39,7 @@ module.exports = {
         .setColor(0x00ff00)
         .setTitle('🎉 Correct!')
         .setDescription(
-          `**${message.author}** guessed it!\n\n` +
-          `**Song:** ${game.songTitle}\n` +
-          `**Artist:** ${game.songAuthor}`
+          `**${message.author}** guessed it!`
         )
         .addFields({
           name: '📊 Score',

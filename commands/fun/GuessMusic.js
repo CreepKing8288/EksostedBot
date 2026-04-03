@@ -292,12 +292,8 @@ async function revealAnswer(channel, game) {
 
   const revealEmbed = new EmbedBuilder()
     .setColor(0x1db954)
-    .setTitle('🎵 The Answer Was...')
-    .setDescription(
-      `**Title:** [${game.songTitle}](${game.songUri || 'https://open.spotify.com'})\n` +
-      `**Artist:** \`${game.songAuthor}\``
-    )
-    .setThumbnail(game.player.queue.current?.info.artworkUrl || null)
+    .setTitle('🎵 Answer Revealed')
+    .setDescription('The song has been revealed! Check the voice channel or wait for the next round.')
     .setFooter({ text: `Round ${game.round}/${game.totalRounds}` })
     .setTimestamp();
 

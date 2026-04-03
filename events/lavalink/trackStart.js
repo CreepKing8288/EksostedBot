@@ -5,9 +5,12 @@ const {
   ButtonStyle,
 } = require('discord.js');
 const { formatTime } = require('../../utils/utils');
+const { activeGames } = require('../../commands/fun/GuessMusic');
 module.exports = {
   name: 'trackStart',
   async execute(client, player, track) {
+    if (activeGames.has(player.guildId)) return;
+
     const channel = client.channels.cache.get(player.textChannelId);
     if (!channel) return;
 
