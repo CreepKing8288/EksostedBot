@@ -1,5 +1,4 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { getPlayerInstance } = require('../../utils/musicPlayer');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -13,21 +12,22 @@ module.exports = {
     ),
 
   async execute(interaction) {
+    await interaction.deferReply();
+
     const client = interaction.client;
     const query = interaction.options.getString('query');
     const member = interaction.member;
 
     if (!member.voice.channel) {
-      return interaction.reply({ content: '❌ You need to join a voice channel first!', ephemeral: true });
+      return interaction.editReply({ content: '❌ You need to join a voice channel first!' });
     }
 
     const botMember = interaction.guild.members.cache.get(client.user.id);
     if (botMember.voice.channel && botMember.voice.channelId !== member.voice.channelId) {
-      return interaction.reply({ content: '❌ You must be in the same voice channel as me!', ephemeral: true });
+      return interaction.editReply({ content: '❌ You must be in the same voice channel as me!' });
     }
 
-    await interaction.deferReply();
-
+    const { getPlayerInstance } = require('../../utils/musicPlayer');
     const player = getPlayerInstance(client);
 
     let searchResult;
@@ -38,11 +38,11 @@ module.exports = {
       });
 
       if (!searchResult || !searchResult.tracks || searchResult.tracks.length === 0) {
-        return interaction.editReply({ content: '❌ No results found! Try a different search term.', ephemeral: true });
+        return interaction.editReply({ content: '❌ No results found! Try a different search term.' });
       }
     } catch (err) {
       console.error('[play] Search error:', err.message);
-      return interaction.editReply({ content: `❌ Search failed: ${err.message}`, ephemeral: true });
+      return interaction.editReply({ content: `❌ Search failed: ${err.message}` });
     }
 
     try {
@@ -111,7 +111,7 @@ module.exports = {
       }
     } catch (err) {
       console.error('[play] Queue error:', err.message);
-      return interaction.editReply({ content: `❌ Failed to play: ${err.message}`, ephemeral: true });
+      return interaction.editReply({ content: `❌ Failed to play: ${err.message}` });
     }
   },
 };
