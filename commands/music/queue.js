@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { getQueueInfo, getNowPlaying } = require('../../utils/musicPlayer');
+const { formatTime } = require('../../utils/utils');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -9,9 +9,7 @@ module.exports = {
       subcommand.setName('view').setDescription('View list of tracks in the queue')
     )
     .addSubcommand((subcommand) =>
-      subcommand
-        .setName('remove')
-        .setDescription('Remove a song from the queue')
+      subcommand.setName('remove').setDescription('Remove a song from the queue')
         .addIntegerOption((option) =>
           option.setName('song').setDescription('The position of the song you want to remove').setRequired(true).setMinValue(1)
         )
@@ -19,71 +17,52 @@ module.exports = {
     .addSubcommand((subcommand) =>
       subcommand.setName('clear').setDescription('Clear the whole queue')
     ),
-
   async execute(interaction) {
     const subcommand = interaction.options.getSubcommand();
     const client = interaction.client;
-    const queueInfo = getQueueInfo(interaction.guild.id);
-    const nowPlaying = getNowPlaying(interaction.guild.id);
+    const player = client.lavalink.players.get(interaction.guild.id);
 
-    if (!nowPlaying && queueInfo.tracks.length === 0) {
+    if (!player || !player.queue.current) {
       return interaction.reply({ content: '❌ Nothing is playing!', ephemeral: true });
+    }
+
+    if (!player.queue.tracks?.length) {
+      return interaction.reply({ content: '❌ Queue is empty!', ephemeral: true });
     }
 
     switch (subcommand) {
       case 'view': {
-        const tracks = queueInfo.tracks;
-        if (tracks.length === 0 && nowPlaying) {
-          return interaction.reply({
-            embeds: [
-              new EmbedBuilder()
-                .setColor('#B0C4DE')
-                .setAuthor({ name: 'Now Playing 🎵', iconURL: client.user.displayAvatarURL() })
-                .setTitle(nowPlaying.title)
-                .setURL(nowPlaying.url)
-                .setThumbnail(nowPlaying.thumbnail)
-                .setDescription(`🎧 \`${nowPlaying.artist}\` • ⌛ \`${formatDuration(nowPlaying.duration)}\``)
-                .setFooter({ text: `Requested by ${nowPlaying.requester?.user?.tag || 'Unknown'}`, iconURL: nowPlaying.requester?.user?.displayAvatarURL() })
-                .setTimestamp(),
-            ],
-          });
-        }
-
-        if (tracks.length === 0) {
-          return interaction.reply({ content: '❌ Queue is empty!', ephemeral: true });
-        }
-
+        const queueTracks = player.queue.tracks;
         const tracksPerPage = 10;
-        const totalPages = Math.ceil(tracks.length / tracksPerPage);
+        const totalPages = Math.ceil(queueTracks.length / tracksPerPage);
         let currentPage = 1;
 
         const generateEmbed = (page) => {
           const start = (page - 1) * tracksPerPage;
           const end = start + tracksPerPage;
-          const pageTracks = tracks.slice(start, end);
-
-          const totalDuration = tracks.reduce((acc, t) => acc + (t.duration || 0), 0);
-
-          const queue = pageTracks.map((track, i) =>
-            `\`${start + i + 1}.\` [${track.title}](${track.url})\n┗ 📺 \`${track.artist}\` • ⌛ \`${formatDuration(track.duration)}\``
+          const currentTrack = player.queue.current;
+          const totalDuration = player.queue.tracks.reduce((acc, track) => acc + track.info.duration, currentTrack.info.duration);
+          const queue = queueTracks.slice(start, end).map((track, i) =>
+            `\`${start + i + 1}.\` [${track.info.title}](${track.info.uri})\n` +
+            `┗ ${getSourceEmoji(track.info.sourceName)} \`${track.info.author}\` • ⌛ \`${formatTime(track.info.duration)}\``
           );
 
           return new EmbedBuilder()
             .setColor('#B0C4DE')
             .setAuthor({ name: 'Music Queue 🎵', iconURL: client.user.displayAvatarURL() })
-            .setThumbnail(nowPlaying?.thumbnail || pageTracks[0]?.thumbnail)
+            .setThumbnail(currentTrack.info.artworkUrl)
             .setDescription(
-              `**Now Playing:**\n[${nowPlaying.title}](${nowPlaying.url})\n┗ 📺 \`${nowPlaying.artist}\` • ⌛ \`${formatDuration(nowPlaying.duration)}\`\n\n**Up Next:**\n${queue.join('\n\n')}`
+              `**Now Playing:**\n` +
+              `[${currentTrack.info.title}](${currentTrack.info.uri})\n` +
+              `┗ ${getSourceEmoji(currentTrack.info.sourceName)} \`${currentTrack.info.author}\` • ⌛ \`${formatTime(currentTrack.info.duration)}\`\n\n` +
+              `**Up Next:**\n${queue.join('\n\n')}`
             )
             .addFields(
-              { name: '🎵 Queue Length', value: `\`${tracks.length} tracks\``, inline: true },
-              { name: '⌛ Total Duration', value: `\`${formatDuration(totalDuration)}\``, inline: true },
-              { name: '🔊 Status', value: '`Playing`', inline: true }
+              { name: '🎵 Queue Length', value: `\`${queueTracks.length} tracks\``, inline: true },
+              { name: '⌛ Total Duration', value: `\`${formatTime(totalDuration)}\``, inline: true },
+              { name: '🔄 Loop Mode', value: `\`${player.repeatMode.charAt(0).toUpperCase() + player.repeatMode.slice(1)}\``, inline: true }
             )
-            .setFooter({
-              text: `Page ${page}/${totalPages} • Use the buttons below to navigate`,
-              iconURL: interaction.user.displayAvatarURL(),
-            })
+            .setFooter({ text: `Page ${page}/${totalPages} • Use the buttons below to navigate`, iconURL: interaction.user.displayAvatarURL() })
             .setTimestamp();
         };
 
@@ -99,7 +78,6 @@ module.exports = {
         collector.on('collect', async (buttonInteraction) => {
           try {
             if (!buttonInteraction.deferred && !buttonInteraction.replied) await buttonInteraction.deferUpdate();
-
             if (buttonInteraction.customId === 'prev' && currentPage > 1) currentPage--;
             else if (buttonInteraction.customId === 'next' && currentPage < totalPages) currentPage++;
 
@@ -126,22 +104,18 @@ module.exports = {
 
       case 'remove': {
         const removePos = interaction.options.getInteger('song');
-        const tracks = queueInfo.tracks;
-        if (tracks.length < removePos) {
+        if (player.queue.tracks?.length < removePos) {
           return interaction.reply({ content: "❌ Cannot remove a track that isn't in the queue!", ephemeral: true });
         }
-
-        const removeTrack = tracks[removePos - 1];
-        const queue = getQueueInfo(interaction.guild.id);
-        const actualQueue = queue.tracks;
-        actualQueue.splice(removePos - 1, 1);
+        const removeTrack = player.queue.tracks[removePos - 1];
+        await player.queue.remove(removeTrack);
 
         const removedEmbed = new EmbedBuilder()
           .setColor('#B0C4DE')
           .setAuthor({ name: 'Removed from Queue 🗑️', iconURL: client.user.displayAvatarURL() })
-          .setDescription(`Removed [${removeTrack.title}](${removeTrack.url})`)
-          .setThumbnail(removeTrack.thumbnail)
-          .addFields({ name: '🎵 Queue Length', value: `\`${actualQueue.length} tracks remaining\``, inline: true })
+          .setDescription(`Removed [${removeTrack.info.title}](${removeTrack.info.uri})`)
+          .setThumbnail(removeTrack.info.artworkUrl)
+          .addFields({ name: '🎵 Queue Length', value: `\`${player.queue.tracks.length} tracks remaining\``, inline: true })
           .setFooter({ text: `Removed by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() })
           .setTimestamp();
 
@@ -150,9 +124,8 @@ module.exports = {
       }
 
       case 'clear': {
-        const { clearQueue } = require('../../utils/musicPlayer');
-        const queueLength = queueInfo.tracks.length;
-        clearQueue(interaction.guild.id);
+        const queueLength = player.queue.tracks.length;
+        player.queue.splice(0, queueLength);
 
         const clearEmbed = new EmbedBuilder()
           .setColor('#B0C4DE')
@@ -168,12 +141,7 @@ module.exports = {
   },
 };
 
-function formatDuration(ms) {
-  if (!ms || ms === 0) return 'Live';
-  const totalSec = Math.floor(ms / 1000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  return `${m}:${String(s).padStart(2, '0')}`;
+function getSourceEmoji(source = '') {
+  const emojis = { youtube: '📺', 'youtube music': '🎵', spotify: '💚', soundcloud: '🟠', deezer: '💿' };
+  return emojis[source.toLowerCase()] || '🎵';
 }

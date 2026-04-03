@@ -1,6 +1,4 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { getNowPlaying } = require('../../utils/musicPlayer');
-const fetch = require('node-fetch');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -8,24 +6,32 @@ module.exports = {
     .setDescription('Fetches lyrics for the currently playing song.'),
   async execute(interaction) {
     try {
+      const client = interaction.client;
       await interaction.deferReply();
 
-      const nowPlaying = getNowPlaying(interaction.guild.id);
+      const guildId = interaction.guildId;
+      const player = client.lavalink.players.get(guildId);
 
-      if (!nowPlaying) {
+      if (!player || !player.queue.current) {
         return interaction.editReply('❌ No song is currently playing.');
       }
 
-      const lyricsUrl = `https://api.lyrics.ovh/v1/${encodeURIComponent(nowPlaying.artist)}/${encodeURIComponent(nowPlaying.title)}`;
-      const response = await fetch(lyricsUrl);
+      const currentTrack = player.queue.current;
+      const lyrics = await player.getLyrics(currentTrack, true);
 
-      if (!response.ok) {
+      if (!lyrics) {
         return interaction.editReply({ content: 'Lyrics not found for this track.', ephemeral: true });
       }
 
-      const data = await response.json();
-      const lyricsText = data.lyrics;
+      const processLyrics = (lyricsData) => {
+        if (lyricsData.text) return lyricsData.text;
+        if (lyricsData.lines && Array.isArray(lyricsData.lines)) {
+          return lyricsData.lines.map((line) => line.line).filter((line) => line && line.trim() !== '').join('\n');
+        }
+        return null;
+      };
 
+      const lyricsText = processLyrics(lyrics);
       if (!lyricsText) {
         return interaction.editReply({ content: 'Lyrics format not supported.', ephemeral: true });
       }
@@ -40,7 +46,7 @@ module.exports = {
 
       const createEmbed = (pageIndex) => {
         return new EmbedBuilder()
-          .setTitle(`🎶 Lyrics for: ${nowPlaying.title}`)
+          .setTitle(`🎶 Lyrics for: ${currentTrack.info.title}`)
           .setDescription(pages[pageIndex])
           .setFooter({ text: `Page ${pageIndex + 1}/${pages.length}` })
           .setTimestamp()
@@ -65,11 +71,8 @@ module.exports = {
           return i.reply({ content: 'These buttons are not for you!', ephemeral: true });
         }
 
-        if (i.customId === 'previous' && currentPage > 0) {
-          currentPage--;
-        } else if (i.customId === 'next' && currentPage < pages.length - 1) {
-          currentPage++;
-        }
+        if (i.customId === 'previous' && currentPage > 0) currentPage--;
+        else if (i.customId === 'next' && currentPage < pages.length - 1) currentPage++;
 
         await i.update({ embeds: [createEmbed(currentPage)], components: [row] });
       });

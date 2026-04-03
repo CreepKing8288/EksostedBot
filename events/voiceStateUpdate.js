@@ -145,35 +145,38 @@ module.exports = {
       });
     }
 
-    const { leaveVoice, getNowPlaying, getConnection } = require('../utils/musicPlayer');
-
-    if (!newActive && activeVoiceTimers.has(key)) {
-      activeVoiceTimers.delete(key);
-    }
-
-    const nowPlaying = getNowPlaying(guild.id);
-    if (!nowPlaying) return;
+    if (!client.lavalink) return;
+    const player = client.lavalink.players.get(guild.id);
+    if (!player) return;
 
     if (oldState.id === client.user.id && !newState.channelId) {
-      leaveVoice(guild.id);
+      player.destroy();
       return;
     }
 
-    const connection = getConnection(guild.id);
-    if (!connection) return;
-
-    const voiceChannel = guild.channels.cache.get(connection.joinConfig.channelId);
+    const voiceChannel = guild.channels.cache.get(player.voiceChannelId);
     if (!voiceChannel) return;
 
     const members = voiceChannel.members.filter((member) => !member.user.bot).size;
 
     if (members === 0) {
-      setTimeout(() => {
-        const stillEmpty = voiceChannel.members.filter((m) => !m.user.bot).size === 0;
-        if (stillEmpty) {
-          leaveVoice(guild.id);
+      player.inactivityTimeout = setTimeout(() => {
+        if (player.playing) player.stopPlaying();
+        player.destroy();
+
+        const textChannel = guild.channels.cache.get(player.textChannelId);
+        if (textChannel) {
+          textChannel.send(
+            '👋 Left the voice channel due to inactivity (3 minutes with no listeners)'
+          );
         }
       }, 180000);
+      if (player.collector) {
+        player.collector.stop();
+      }
+    } else if (player.inactivityTimeout) {
+      clearTimeout(player.inactivityTimeout);
+      player.inactivityTimeout = null;
     }
   },
 };

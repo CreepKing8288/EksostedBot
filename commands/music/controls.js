@@ -1,5 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { joinVoice, leaveVoice, skipTrack, getNowPlaying, getPlayer, getQueueInfo } = require('../../utils/musicPlayer');
+const { SlashCommandBuilder } = require('discord.js');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -27,103 +26,128 @@ module.exports = {
       subcommand.setName('shuffle').setDescription('Randomize the Queue Order')
     )
     .addSubcommand((subcommand) =>
-      subcommand
-        .setName('volume')
-        .setDescription('Changes the volume of the player')
+      subcommand.setName('seek').setDescription('Go to the desired position of the song')
+        .addStringOption((option) => option.setName('time').setDescription('Time you want to seek to'))
+    )
+    .addSubcommand((subcommand) =>
+      subcommand.setName('volume').setDescription('Changes the volume of the player')
         .addIntegerOption((option) =>
           option.setName('set').setDescription('Volume').setRequired(true).setMaxValue(100).setMinValue(0)
         )
     )
     .addSubcommand((subcommand) =>
-      subcommand
-        .setName('skipto')
-        .setDescription('Skips to the specific song in the queue')
+      subcommand.setName('skipto').setDescription('Skips to the specific song in the queue')
         .addIntegerOption((option) =>
           option.setName('position').setDescription('The position you want to skip to').setRequired(true).setMinValue(1)
         )
     ),
-
   async execute(interaction) {
     const client = interaction.client;
+    const player = client.lavalink.players.get(interaction.guild.id);
     const subcommand = interaction.options.getSubcommand();
 
-    if (subcommand === 'join') {
-      if (!interaction.member.voice.channel) {
-        return interaction.reply({ content: '❌ You need to join a voice channel first!', ephemeral: true });
+    if (subcommand !== 'join') {
+      if (!player) {
+        return interaction.reply({ content: 'Nothing is playing!', ephemeral: true });
       }
-      joinVoice(interaction.guild.id, interaction.member.voice.channel);
-      return interaction.reply(`🎵 Joined <#${interaction.member.voice.channel.id}>`);
-    }
-
-    const nowPlaying = getNowPlaying(interaction.guild.id);
-    if (!nowPlaying && subcommand !== 'stop') {
-      return interaction.reply({ content: 'Nothing is playing!', ephemeral: true });
     }
 
     switch (subcommand) {
-      case 'pause': {
-        const player = getPlayer(interaction.guild.id);
-        player.pause();
-        return interaction.reply('⏸️ Paused');
-      }
-      case 'resume': {
-        const player = getPlayer(interaction.guild.id);
-        player.unpause();
-        return interaction.reply('▶️ Resumed');
-      }
-      case 'skip': {
-        const queueInfo = getQueueInfo(interaction.guild.id);
-        if (queueInfo.tracks.length === 0) {
+      case 'join':
+        if (!player) {
+          client.lavalink.createPlayer({
+            guildId: interaction.guild.id,
+            voiceChannelId: interaction.member.voice.channel.id,
+            textChannelId: interaction.channel.id,
+            selfDeaf: true,
+          }).connect();
+          return interaction.reply(`🎵 Joined <#${interaction.member.voice.channel.id}>`);
+        } else {
+          return interaction.reply(`I'm already in the VC <#${player.voiceChannelId}>`);
+        }
+
+      case 'pause':
+        await player.pause();
+        interaction.reply('⏸️ Paused');
+        break;
+
+      case 'resume':
+        await player.resume();
+        interaction.reply('▶️ Resumed');
+        break;
+
+      case 'skip':
+        if (!player.queue.tracks?.length) {
           return interaction.reply({ content: 'Queue is empty!', ephemeral: true });
         }
-        skipTrack(interaction.guild.id);
-        return interaction.reply('⏭️ Skipped');
-      }
+        await player.skip();
+        interaction.reply('⏭️ Skipped');
+        break;
+
       case 'skipto': {
         const skipPos = interaction.options.getInteger('position');
-        const queueInfo = getQueueInfo(interaction.guild.id);
-        if (queueInfo.tracks.length === 0) {
+        if (!player.queue.tracks?.length) {
           return interaction.reply({ content: 'Queue is empty!', ephemeral: true });
         }
-        if (queueInfo.tracks.length < skipPos) {
+        if (player.queue.tracks?.length < skipPos) {
           return interaction.reply({ content: "Can't skip more than the Queue size", ephemeral: true });
         }
-        const queue = getQueueInfo(interaction.guild.id);
-        const actualQueue = queue.tracks;
-        actualQueue.splice(0, skipPos);
-        skipTrack(interaction.guild.id);
-        return interaction.reply(`⏭️ Skipped to \`${skipPos}\``);
+        await player.skip(skipPos);
+        interaction.reply(`⏭️ Skipped to \`${skipPos}\``);
+        break;
       }
-      case 'stop': {
-        const { clearQueue } = require('../../utils/musicPlayer');
-        clearQueue(interaction.guild.id);
-        return interaction.reply('⏹️ Stopped and cleared queue');
-      }
-      case 'leave': {
-        leaveVoice(interaction.guild.id);
-        return interaction.reply('👋 Left the voice channel');
-      }
-      case 'shuffle': {
-        const queueInfo = getQueueInfo(interaction.guild.id);
-        if (queueInfo.tracks.length === 0) {
+
+      case 'stop':
+        await player.stopPlaying();
+        interaction.reply('⏹️ Stopped');
+        break;
+
+      case 'leave':
+        await player.destroy();
+        interaction.reply('👋 Left the voice channel');
+        break;
+
+      case 'shuffle':
+        if (!player.queue.tracks?.length) {
           return interaction.reply({ content: 'Queue is empty!', ephemeral: true });
         }
-        const actualQueue = queueInfo.tracks;
-        for (let i = actualQueue.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [actualQueue[i], actualQueue[j]] = [actualQueue[j], actualQueue[i]];
-        }
-        return interaction.reply('🔀 Queue shuffled');
-      }
+        player.queue.shuffle();
+        interaction.reply('🔀 Queue shuffled');
+        break;
+
       case 'volume': {
         const vol = interaction.options.getInteger('set');
-        const player = getPlayer(interaction.guild.id);
-        const resource = player.state.resource;
-        if (resource) {
-          resource.volume.setVolume(vol / 100);
+        player.setVolume(vol);
+        interaction.reply(`🔊 Volume set to \`${vol}\``);
+        break;
+      }
+
+      case 'seek': {
+        const timeInput = interaction.options.getString('time').trim();
+        const timeParts = timeInput.split(':').map(Number);
+        let seekTime = 0;
+        if (timeParts.length === 1) seekTime = timeParts[0];
+        else if (timeParts.length === 2) seekTime = timeParts[0] * 60 + timeParts[1];
+        else if (timeParts.length === 3) seekTime = timeParts[0] * 3600 + timeParts[1] * 60 + timeParts[2];
+        else return interaction.editReply('❌ Invalid time format. Use `hh:mm:ss`, `mm:ss`, or `ss`.');
+
+        seekTime *= 1000;
+        const trackDuration = player.queue.current.duration;
+        if (seekTime < 0 || seekTime > trackDuration) {
+          return interaction.editReply(`❌ Seek time is out of range. The track duration is **${formatDuration(trackDuration)}**.`);
         }
-        return interaction.reply(`🔊 Volume set to \`${vol}\``);
+        await player.seek(seekTime);
+        return interaction.reply(`⏩ **Seeked to:** \`${formatDuration(seekTime)}\``);
       }
     }
   },
 };
+
+function formatDuration(ms) {
+  const seconds = Math.floor(ms / 1000);
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}

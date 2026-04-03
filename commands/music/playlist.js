@@ -1,7 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const Playlist = require('../../models/Playlist');
-const ytSearch = require('yt-search');
-const { addToQueue, joinVoice, getNowPlaying } = require('../../utils/musicPlayer');
+const { formatTime } = require('../../utils/utils');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -33,7 +32,7 @@ module.exports = {
           opt.setName('name').setDescription('Name of your playlist').setRequired(true).setAutocomplete(true)
         )
         .addStringOption((opt) =>
-          opt.setName('query').setDescription('Track URL or search query').setRequired(true)
+          opt.setName('query').setDescription('Track URL or search query').setRequired(true).setAutocomplete(true)
         )
     )
     .addSubcommand((sub) =>
@@ -77,20 +76,33 @@ module.exports = {
         return await interaction.respond([{ name: 'Start typing to search...', value: 'start_typing' }]);
       }
 
+      const player = interaction.client.lavalink.createPlayer({
+        guildId: interaction.guildId,
+        textChannelId: interaction.channelId,
+      });
+
       try {
-        const results = await ytSearch(focused.value);
-        if (!results.videos.length) {
+        const results = await player.search({ query: focused.value, source: 'spsearch' });
+
+        if (!results?.tracks?.length) {
           return await interaction.respond([{ name: 'No results found', value: 'no_results' }]);
         }
 
-        return await interaction.respond(
-          results.videos.slice(0, 25).map((track) => ({
-            name: `${track.title} - ${track.author.name}`,
-            value: track.url,
-          }))
-        );
-      } catch {
+        let options = [];
+        if (results.loadType === 'playlist') {
+          options = [{ name: `📑 Playlist: ${results.playlist?.title || 'Unknown'} (${results.tracks.length} tracks)`, value: focused.value }];
+        } else {
+          options = results.tracks.slice(0, 25).map((track) => ({
+            name: `${track.info.title} - ${track.info.author}`,
+            value: track.info.uri,
+          }));
+        }
+
+        return await interaction.respond(options);
+      } catch (error) {
         return await interaction.respond([{ name: 'Error searching tracks', value: 'error' }]);
+      } finally {
+        try { await player.destroy(); } catch {}
       }
     }
   },
@@ -123,7 +135,16 @@ module.exports = {
           if (!playlist) return await interaction.editReply('❌ Playlist not found!');
           if (!interaction.member.voice.channel) return await interaction.editReply('❌ You need to join a voice channel first!');
 
-          joinVoice(interaction.guild.id, interaction.member.voice.channel);
+          let player = interaction.client.lavalink.players.get(interaction.guild.id);
+          if (!player) {
+            player = interaction.client.lavalink.createPlayer({
+              guildId: interaction.guild.id,
+              voiceChannelId: interaction.member.voice.channel.id,
+              textChannelId: interaction.channel.id,
+              selfDeaf: true,
+            });
+            await player.connect();
+          }
 
           const loadEmbed = new EmbedBuilder()
             .setColor('#F0E68C')
@@ -131,7 +152,7 @@ module.exports = {
             .setDescription(`Loading **${playlist.tracks.length}** tracks from playlist: **${name}**`)
             .addFields(
               { name: '📑 Playlist', value: `\`${name}\``, inline: true },
-              { name: '⌛ Total Duration', value: `\`${formatDuration(playlist.tracks.reduce((acc, t) => acc + (t.duration || 0), 0))}\``, inline: true }
+              { name: '⌛ Total Duration', value: `\`${formatTime(playlist.tracks.reduce((acc, track) => acc + track.duration, 0))}\``, inline: true }
             )
             .setFooter({ text: `Loaded by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() })
             .setTimestamp();
@@ -139,37 +160,34 @@ module.exports = {
           await interaction.editReply({ embeds: [loadEmbed] });
 
           for (const track of playlist.tracks) {
-            const result = await ytSearch(`${track.title} ${track.author || ''}`);
-            if (result.videos[0]) {
-              addToQueue(interaction.guild.id, {
-                title: track.title,
-                url: result.videos[0].url,
-                duration: result.videos[0].seconds * 1000,
-                thumbnail: result.videos[0].thumbnail,
-                author: result.videos[0].author.name,
-                requester: interaction.member,
-              }, interaction.channel);
+            const result = await player.search({ query: track.uri, source: 'spsearch' });
+            if (result?.tracks?.[0]) {
+              result.tracks[0].userData = { requester: interaction.member };
+              await player.queue.add(result.tracks[0]);
             }
           }
+
+          if (!player.playing) await player.play();
 
           return await interaction.editReply(`✅ Loaded ${playlist.tracks.length} tracks from playlist: ${name}`);
         }
 
         case 'addcurrent': {
           const name = interaction.options.getString('name');
-          const nowPlaying = getNowPlaying(interaction.guild.id);
+          const player = interaction.client.lavalink.players.get(interaction.guild.id);
 
-          if (!nowPlaying) return await interaction.editReply('❌ Nothing is playing right now!');
+          if (!player?.queue?.current) return await interaction.editReply('❌ Nothing is playing right now!');
 
           const playlist = await Playlist.findOne({ userId: interaction.user.id, name });
           if (!playlist) return await interaction.editReply('❌ Playlist not found!');
 
+          const track = player.queue.current;
           playlist.tracks.push({
-            title: nowPlaying.title,
-            uri: nowPlaying.url,
-            author: nowPlaying.artist,
-            duration: nowPlaying.duration,
-            artworkUrl: nowPlaying.thumbnail,
+            title: track.info.title,
+            uri: track.info.uri,
+            author: track.info.author,
+            duration: track.info.duration,
+            artworkUrl: track.info.artworkUrl,
           });
           await playlist.save();
 
@@ -177,11 +195,11 @@ module.exports = {
             .setColor('#F0E68C')
             .setTitle('🎵 Track Added to Playlist')
             .setDescription(`Added track to playlist: **${name}**`)
-            .setThumbnail(nowPlaying.thumbnail)
+            .setThumbnail(track.info.artworkUrl)
             .addFields(
-              { name: '🎵 Track', value: `[${nowPlaying.title}](${nowPlaying.url})`, inline: true },
-              { name: '👤 Artist', value: `\`${nowPlaying.artist}\``, inline: true },
-              { name: '⌛ Duration', value: `\`${formatDuration(nowPlaying.duration)}\``, inline: true },
+              { name: '🎵 Track', value: `[${track.info.title}](${track.info.uri})`, inline: true },
+              { name: '👤 Artist', value: `\`${track.info.author}\``, inline: true },
+              { name: '⌛ Duration', value: `\`${formatTime(track.info.duration)}\``, inline: true },
               { name: '📑 Playlist Tracks', value: `\`${playlist.tracks.length} tracks\``, inline: true }
             )
             .setFooter({ text: `Added by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() })
@@ -192,29 +210,28 @@ module.exports = {
 
         case 'addqueue': {
           const name = interaction.options.getString('name');
-          const nowPlaying = getNowPlaying(interaction.guild.id);
-          if (!nowPlaying) return await interaction.editReply('❌ Nothing is playing right now!');
+          const player = interaction.client.lavalink.players.get(interaction.guild.id);
+
+          if (!player?.queue?.current) return await interaction.editReply('❌ Nothing is playing right now!');
 
           const playlist = await Playlist.findOne({ userId: interaction.user.id, name });
           if (!playlist) return await interaction.editReply('❌ Playlist not found!');
 
           playlist.tracks.push({
-            title: nowPlaying.title,
-            uri: nowPlaying.url,
-            author: nowPlaying.artist,
-            duration: nowPlaying.duration,
-            artworkUrl: nowPlaying.thumbnail,
+            title: player.queue.current.info.title,
+            uri: player.queue.current.info.uri,
+            author: player.queue.current.info.author,
+            duration: player.queue.current.info.duration,
+            artworkUrl: player.queue.current.info.artworkUrl,
           });
 
-          const { getQueueInfo } = require('../../utils/musicPlayer');
-          const queueInfo = getQueueInfo(interaction.guild.id);
-          for (const track of queueInfo.tracks) {
+          for (const track of player.queue.tracks) {
             playlist.tracks.push({
-              title: track.title,
-              uri: track.url,
-              author: track.artist,
-              duration: track.duration,
-              artworkUrl: track.thumbnail,
+              title: track.info.title,
+              uri: track.info.uri,
+              author: track.info.author,
+              duration: track.info.duration,
+              artworkUrl: track.info.artworkUrl,
             });
           }
 
@@ -223,11 +240,11 @@ module.exports = {
           const embed = new EmbedBuilder()
             .setColor('#F0E68C')
             .setTitle('🎵 Queue Added to Playlist')
-            .setDescription(`Added **${queueInfo.tracks.length + 1}** tracks to playlist: **${name}**`)
+            .setDescription(`Added **${player.queue.tracks.length + 1}** tracks to playlist: **${name}**`)
             .addFields(
-              { name: '📑 Added Tracks', value: `\`${queueInfo.tracks.length + 1} tracks\``, inline: true },
+              { name: '📑 Added Tracks', value: `\`${player.queue.tracks.length + 1} tracks\``, inline: true },
               { name: '📝 Total Tracks', value: `\`${playlist.tracks.length} tracks\``, inline: true },
-              { name: '⌛ Total Duration', value: `\`${formatDuration(playlist.tracks.reduce((acc, t) => acc + (t.duration || 0), 0))}\``, inline: true }
+              { name: '⌛ Total Duration', value: `\`${formatTime(playlist.tracks.reduce((acc, track) => acc + track.duration, 0))}\``, inline: true }
             )
             .setFooter({ text: `Added by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() })
             .setTimestamp();
@@ -242,23 +259,40 @@ module.exports = {
           const playlist = await Playlist.findOne({ userId: interaction.user.id, name });
           if (!playlist) return await interaction.editReply('❌ Playlist not found!');
 
-          try {
-            const results = await ytSearch(query);
-            if (!results.videos.length) return await interaction.editReply('❌ No tracks found!');
+          const player = interaction.client.lavalink.createPlayer({
+            guildId: interaction.guild.id,
+            textChannelId: interaction.channel.id,
+          });
 
-            const track = results.videos[0];
+          const results = await player.search({ query, source: 'spsearch' });
+
+          if (!results?.tracks?.length) {
+            return await interaction.editReply('❌ No tracks found!');
+          }
+
+          if (results.loadType === 'playlist') {
+            for (const track of results.tracks) {
+              playlist.tracks.push({
+                title: track.info.title,
+                uri: track.info.uri,
+                author: track.info.author,
+                duration: track.info.duration,
+                artworkUrl: track.info.artworkUrl,
+              });
+            }
+            await playlist.save();
+            return await interaction.editReply(`✅ Added ${results.tracks.length} tracks from playlist to: ${name}`);
+          } else {
+            const track = results.tracks[0];
             playlist.tracks.push({
-              title: track.title,
-              uri: track.url,
-              author: track.author.name,
-              duration: track.seconds * 1000,
-              artworkUrl: track.thumbnail,
+              title: track.info.title,
+              uri: track.info.uri,
+              author: track.info.author,
+              duration: track.info.duration,
+              artworkUrl: track.info.artworkUrl,
             });
             await playlist.save();
-
-            return await interaction.editReply(`✅ Added "${track.title}" to playlist: ${name}`);
-          } catch {
-            return await interaction.editReply('❌ Error searching for track.');
+            return await interaction.editReply(`✅ Added "${track.info.title}" to playlist: ${name}`);
           }
         }
 
@@ -280,7 +314,7 @@ module.exports = {
             .addFields(
               { name: '🎵 Removed Track', value: `[${removedTrack.title}](${removedTrack.uri})`, inline: false },
               { name: '📑 Remaining Tracks', value: `\`${playlist.tracks.length} tracks\``, inline: true },
-              { name: '⌛ Track Duration', value: `\`${formatDuration(removedTrack.duration)}\``, inline: true }
+              { name: '⌛ Track Duration', value: `\`${formatTime(removedTrack.duration)}\``, inline: true }
             )
             .setFooter({ text: `Removed by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() })
             .setTimestamp();
@@ -301,27 +335,27 @@ module.exports = {
             const start = (page - 1) * tracksPerPage;
             const end = start + tracksPerPage;
             const tracks = playlist.tracks.slice(start, end);
-            const totalDuration = playlist.tracks.reduce((acc, t) => acc + (t.duration || 0), 0);
+            const totalDuration = playlist.tracks.reduce((acc, track) => acc + track.duration, 0);
 
-            return new EmbedBuilder()
+            const embed = new EmbedBuilder()
               .setColor('#F0E68C')
               .setTitle(`🎵 Playlist: ${playlist.name}`)
               .setDescription(
                 tracks.length
                   ? tracks.map((track, i) =>
-                      `\`${start + i + 1}.\` [${track.title}](${track.uri})\n┗ 👤 \`${track.author}\` • ⌛ \`${formatDuration(track.duration)}\``
+                      `\`${start + i + 1}.\` [${track.title}](${track.uri})\n` +
+                      `┗ 👤 \`${track.author}\` • ⌛ \`${formatTime(track.duration)}\``
                     ).join('\n\n')
                   : 'No tracks in this playlist'
               )
               .addFields(
                 { name: '📑 Total Tracks', value: `\`${playlist.tracks.length} tracks\``, inline: true },
-                { name: '⌛ Total Duration', value: `\`${formatDuration(totalDuration)}\``, inline: true }
+                { name: '⌛ Total Duration', value: `\`${formatTime(totalDuration)}\``, inline: true }
               )
-              .setFooter({
-                text: `Page ${page}/${totalPages} • Use the buttons below to navigate`,
-                iconURL: interaction.user.displayAvatarURL(),
-              })
+              .setFooter({ text: `Page ${page}/${totalPages} • Use the buttons below to navigate`, iconURL: interaction.user.displayAvatarURL() })
               .setTimestamp();
+
+            return embed;
           };
 
           const row = new ActionRowBuilder().addComponents(
@@ -387,7 +421,7 @@ module.exports = {
             .setDescription(`Successfully deleted playlist: **${name}**`)
             .addFields(
               { name: '📑 Deleted Tracks', value: `\`${playlist.tracks.length} tracks\``, inline: true },
-              { name: '⌛ Total Duration', value: `\`${formatDuration(playlist.tracks.reduce((acc, t) => acc + (t.duration || 0), 0))}\``, inline: true }
+              { name: '⌛ Total Duration', value: `\`${formatTime(playlist.tracks.reduce((acc, track) => acc + track.duration, 0))}\``, inline: true }
             )
             .setFooter({ text: `Deleted by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() })
             .setTimestamp();
@@ -401,13 +435,3 @@ module.exports = {
     }
   },
 };
-
-function formatDuration(ms) {
-  if (!ms || ms === 0) return 'Live';
-  const totalSec = Math.floor(ms / 1000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  return `${m}:${String(s).padStart(2, '0')}`;
-}
