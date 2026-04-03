@@ -123,8 +123,8 @@ function reply(interaction, deferred, payload) {
 }
 
 async function safeConnect(queue, channel) {
-  if (queue.node?.connect) return queue.node.connect(channel);
-  if (queue.connect) return queue.connect(channel);
+  if (queue.node?.connect) return queue.node.connect(channel.id);
+  if (queue.connect) return queue.connect(channel.id);
 }
 
 async function safePlay(queue) {
