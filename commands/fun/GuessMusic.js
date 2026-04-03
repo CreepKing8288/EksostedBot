@@ -1,9 +1,35 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus } = require('@discordjs/voice');
-const playdl = require('play-dl');
+const { spawn } = require('child_process');
 const ytSearch = require('yt-search');
 
 const activeGames = new Map();
+
+function getAudioStream(url) {
+  return new Promise((resolve, reject) => {
+    const ytDlp = spawn('yt-dlp', [
+      '--no-playlist',
+      '-f', 'bestaudio/best',
+      '-o', '-',
+      '--no-part',
+      '--no-cache-dir',
+      url,
+    ]);
+
+    ytDlp.on('error', (err) => reject(err));
+    ytDlp.stderr.on('data', (data) => {
+      if (data.toString().includes('ERROR')) reject(new Error(data.toString()));
+    });
+    ytDlp.stdout.on('data', () => {
+      ytDlp.stdout.removeAllListeners('data');
+      resolve(ytDlp.stdout);
+    });
+    setTimeout(() => {
+      ytDlp.kill();
+      reject(new Error('yt-dlp timed out'));
+    }, 15000);
+  });
+}
 
 const difficultyConfig = {
   easy: {
@@ -190,9 +216,8 @@ module.exports = {
 
     const video = results.videos[Math.floor(Math.random() * Math.min(15, results.videos.length))];
 
-    const streamInfo = await playdl.stream(video.url);
-    const stream = streamInfo.stream;
-    const resource = createAudioResource(stream.stream, { inlineVolume: true });
+    const stream = await getAudioStream(video.url);
+    const resource = createAudioResource(stream, { inlineVolume: true });
     resource.volume.setVolume(1);
     player.play(resource);
 
@@ -326,9 +351,8 @@ async function nextRound(interaction) {
 
   const video = results.videos[Math.floor(Math.random() * Math.min(15, results.videos.length))];
 
-  const streamInfo = await playdl.stream(video.url);
-  const stream = streamInfo.stream;
-  const resource = createAudioResource(stream.stream, { inlineVolume: true });
+  const stream = await getAudioStream(video.url);
+  const resource = createAudioResource(stream, { inlineVolume: true });
   resource.volume.setVolume(1);
   game.player.play(resource);
 
