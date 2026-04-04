@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eksosted BOT | Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app">
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <a href="/" class="logo">Eksosted BOT</a>
+      </div>
+
+      <div class="server-selector">
+        <button class="server-select-btn" id="serverSelectBtn">
+          <span class="server-icon" id="serverIcon">🏠</span>
+          <span class="server-name" id="serverName">Select Server</span>
+          <span class="chevron">▼</span>
+        </button>
+        <div class="server-dropdown" id="serverDropdown">
+          <div class="dropdown-search">
+            <input type="text" placeholder="Search servers..." id="serverSearch">
+          </div>
+          <div class="dropdown-list" id="serverList"></div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <div class="nav-section-title">Overview</div>
+          <a href="#" class="nav-item active" data-panel="overview">
+            <span class="nav-icon">📊</span> Overview
+          </a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Moderation</div>
+          <a href="#" class="nav-item" data-panel="swearfilter">
+            <span class="nav-icon">🔒</span> Swear Filter
+          </a>
+          <a href="#" class="nav-item" data-panel="antispam">
+            <span class="nav-icon">🛡️</span> Anti-Spam
+          </a>
+          <a href="#" class="nav-item" data-panel="linkfilter">
+            <span class="nav-icon">🔗</span> Link Filter
+          </a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Community</div>
+          <a href="#" class="nav-item" data-panel="starboard">
+            <span class="nav-icon">⭐</span> Starboard
+          </a>
+          <a href="#" class="nav-item" data-panel="crates">
+            <span class="nav-icon">🎁</span> Crate Drops
+          </a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Tickets</div>
+          <a href="#" class="nav-item" data-panel="tickets">
+            <span class="nav-icon">🎫</span> Ticket Settings
+          </a>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-info" id="userInfo">
+          <div class="user-avatar" id="userAvatar"></div>
+          <div class="user-details">
+            <div class="user-name" id="userName">Loading...</div>
+            <div class="user-id" id="userId"></div>
+          </div>
+          <a href="/auth/logout" class="logout-btn" title="Logout">🚪</a>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main">
+      <header class="topbar">
+        <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
+        <h1 class="topbar-title" id="topbarTitle">Overview</h1>
+        <div class="topbar-actions">
+          <span class="status-badge" id="statusBadge">
+            <span class="status-dot"></span> Connected
+          </span>
+        </div>
+      </header>
+
+      <div class="content">
+        <!-- OVERVIEW PANEL -->
+        <div class="panel active" id="panel-overview">
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-icon" style="background: rgba(124, 58, 237, 0.1); color: #a78bfa;">🔒</div>
+              <div class="stat-info">
+                <div class="stat-label">Swear Filter</div>
+                <div class="stat-value" id="stat-swear">Disabled</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6;">🛡️</div>
+              <div class="stat-info">
+                <div class="stat-label">Anti-Spam</div>
+                <div class="stat-value" id="stat-antispam">Disabled</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;">🔗</div>
+              <div class="stat-info">
+                <div class="stat-label">Link Filter</div>
+                <div class="stat-value" id="stat-linkfilter">Disabled</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">⭐</div>
+              <div class="stat-info">
+                <div class="stat-label">Starboard</div>
+                <div class="stat-value" id="stat-starboard">Disabled</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon" style="background: rgba(236, 72, 153, 0.1); color: #ec4899;">🎁</div>
+              <div class="stat-info">
+                <div class="stat-label">Crate Drops</div>
+                <div class="stat-value" id="stat-crates">Disabled</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">🎫</div>
+              <div class="stat-info">
+                <div class="stat-label">Tickets</div>
+                <div class="stat-value" id="stat-tickets">Disabled</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="welcome-card">
+            <h2>Welcome to the Dashboard</h2>
+            <p>Select a server from the sidebar to manage your bot settings. All changes are saved instantly.</p>
+          </div>
+        </div>
+
+        <!-- SWEAR FILTER PANEL -->
+        <div class="panel" id="panel-swearfilter">
+          <div class="panel-header">
+            <h2>Swear Filter</h2>
+            <p>Configure word-based and AI-powered profanity detection.</p>
+          </div>
+          <div class="card">
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Enable Swear Filter</div>
+                <div class="toggle-desc">Automatically delete messages containing profanity.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="swear-enabled">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">AI Detection Mode</div>
+                <div class="toggle-desc">Use AI to detect profanity instead of word list.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="swear-aimode">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Custom Blocked Words</label>
+              <textarea class="form-textarea" id="swear-words" placeholder="Enter words separated by commas..."></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="saveConfig('SwearFilter')">Save Changes</button>
+          </div>
+        </div>
+
+        <!-- ANTI-SPAM PANEL -->
+        <div class="panel" id="panel-antispam">
+          <div class="panel-header">
+            <h2>Anti-Spam</h2>
+            <p>Protect your server from message spam and excessive caps.</p>
+          </div>
+          <div class="card">
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Enable Anti-Spam</div>
+                <div class="toggle-desc">Detect and punish rapid message sending.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="antispam-enabled">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Max Messages</label>
+                <input type="number" class="form-input" id="antispam-max" min="2" max="20" value="5">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Time Window (seconds)</label>
+                <input type="number" class="form-input" id="antispam-window" min="2" max="30" value="5">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Punishment</label>
+                <select class="form-select" id="antispam-punishment">
+                  <option value="delete">Delete Message</option>
+                  <option value="warn">Warn User</option>
+                  <option value="timeout">Timeout User</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Timeout Duration (seconds)</label>
+                <input type="number" class="form-input" id="antispam-timeout" min="10" value="60">
+              </div>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Duplicate Message Check</div>
+                <div class="toggle-desc">Block repeated identical messages.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="antispam-duplicate">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Excessive Caps Check</div>
+                <div class="toggle-desc">Block messages with too many uppercase letters.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="antispam-caps">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <button class="btn btn-primary" onclick="saveConfig('AntiSpam')">Save Changes</button>
+          </div>
+        </div>
+
+        <!-- LINK FILTER PANEL -->
+        <div class="panel" id="panel-linkfilter">
+          <div class="panel-header">
+            <h2>Link Filter</h2>
+            <p>Block Discord invites and all links with domain whitelisting.</p>
+          </div>
+          <div class="card">
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Enable Link Filter</div>
+                <div class="toggle-desc">Block links and/or Discord invites.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="linkfilter-enabled">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Block Discord Invites</div>
+                <div class="toggle-desc">Auto-delete discord.gg and discord.com/invite links.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="linkfilter-invites">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Block All Links</div>
+                <div class="toggle-desc">Block all URLs except whitelisted domains.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="linkfilter-alllinks">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Allowed Domains</label>
+              <textarea class="form-textarea" id="linkfilter-domains" placeholder="Enter domains separated by commas (e.g. youtube.com, twitch.tv)..."></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="saveConfig('LinkFilter')">Save Changes</button>
+          </div>
+        </div>
+
+        <!-- STARBOARD PANEL -->
+        <div class="panel" id="panel-starboard">
+          <div class="panel-header">
+            <h2>Starboard</h2>
+            <p>Highlight popular messages with star reactions.</p>
+          </div>
+          <div class="card">
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Enable Starboard</div>
+                <div class="toggle-desc">Auto-post highly starred messages.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="starboard-enabled">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Star Channel ID</label>
+                <input type="text" class="form-input" id="starboard-channel" placeholder="Channel ID where stars are posted">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Star Threshold</label>
+                <input type="number" class="form-input" id="starboard-threshold" min="1" max="50" value="3">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Star Emoji</label>
+              <input type="text" class="form-input" id="starboard-emoji" value="⭐" style="max-width: 100px;">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Ignored Channels</label>
+              <textarea class="form-textarea" id="starboard-ignored" placeholder="Enter channel IDs separated by commas..."></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="saveConfig('Starboard')">Save Changes</button>
+          </div>
+        </div>
+
+        <!-- CRATE DROPS PANEL -->
+        <div class="panel" id="panel-crates">
+          <div class="panel-header">
+            <h2>Crate Drops</h2>
+            <p>Configure automatic and manual crate drops with XP rewards.</p>
+          </div>
+          <div class="card">
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Enable Crate Drops</div>
+                <div class="toggle-desc">Allow crate drops in this server.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="crate-enabled">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Auto Drop</div>
+                <div class="toggle-desc">Automatically drop crates at random intervals.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="crate-autodrop">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Min Interval (minutes)</label>
+                <input type="number" class="form-input" id="crate-min" min="1" value="60">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Max Interval (minutes)</label>
+                <input type="number" class="form-input" id="crate-max" min="1" value="120">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Claim Expiry (minutes)</label>
+                <input type="number" class="form-input" id="crate-expiry" min="1" value="5">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Drop Channel ID</label>
+                <input type="text" class="form-input" id="crate-channel" placeholder="Channel ID for drops">
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="saveConfig('CrateConfig')">Save Changes</button>
+          </div>
+        </div>
+
+        <!-- TICKETS PANEL -->
+        <div class="panel" id="panel-tickets">
+          <div class="panel-header">
+            <h2>Ticket Settings</h2>
+            <p>Configure the ticket system, welcome messages, and limits.</p>
+          </div>
+          <div class="card">
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Enable Ticket System</div>
+                <div class="toggle-desc">Allow users to create support tickets.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="ticket-enabled">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Ticket Category ID</label>
+                <input type="text" class="form-input" id="ticket-category" placeholder="Discord category ID">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Log Channel ID</label>
+                <input type="text" class="form-input" id="ticket-logs" placeholder="Channel for transcripts">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Ticket Limit (per user)</label>
+                <input type="number" class="form-input" id="ticket-limit" min="1" max="10" value="3">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Support Role IDs</label>
+                <input type="text" class="form-input" id="ticket-roles" placeholder="Role IDs separated by commas">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Welcome Message</label>
+              <textarea class="form-textarea" id="ticket-welcome" placeholder="Use {user} to mention the ticket creator"></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Close Message</label>
+              <input type="text" class="form-input" id="ticket-close" placeholder="Message shown before closing">
+            </div>
+            <button class="btn btn-primary" onclick="saveConfig('TicketSettings')">Save Changes</button>
+          </div>
+        </div>
+
+        <!-- NO SERVER SELECTED -->
+        <div class="panel" id="panel-noserver">
+          <div class="empty-state">
+            <div class="empty-icon">🏠</div>
+            <h2>Select a Server</h2>
+            <p>Choose a server from the sidebar to start managing your bot settings.</p>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast"></div>
+
+  <script src="/dashboard.js"></script>
+</body>
+</html>
