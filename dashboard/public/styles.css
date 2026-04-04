@@ -193,6 +193,14 @@ body {
   flex-shrink: 0;
 }
 
+.di-icon-img {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
 /* SIDEBAR NAV */
 .sidebar-nav {
   flex: 1;

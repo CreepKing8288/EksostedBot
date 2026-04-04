@@ -65,12 +65,17 @@ function renderUser(user) {
 
 function renderServerList(guilds) {
   const list = document.getElementById('serverList');
-  list.innerHTML = guilds.map(g => `
+  list.innerHTML = guilds.map(g => {
+    const iconHtml = g.icon
+      ? `<img class="di-icon-img" src="https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=32" alt="">`
+      : `<div class="di-icon">🏠</div>`;
+    return `
     <div class="dropdown-item" data-guild-id="${g.id}" onclick="selectServer('${g.id}', '${g.name.replace(/'/g, "\\'")}')">
-      <div class="di-icon">${g.icon ? '🖼️' : '🏠'}</div>
+      ${iconHtml}
       <span>${g.name}</span>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function filterServers(e) {
@@ -93,8 +98,17 @@ async function selectServer(guildId, guildName) {
   currentGuildId = guildId;
   closeDropdown();
 
+  const guild = userGuilds.find(g => g.id === guildId);
+  const iconEl = document.getElementById('serverIcon');
+  if (guild && guild.icon) {
+    iconEl.innerHTML = `<img src="https://cdn.discordapp.com/icons/${guildId}/${guild.icon}.png?size=32" alt="" style="width:32px;height:32px;border-radius:8px;">`;
+  } else {
+    iconEl.textContent = '🏠';
+    iconEl.innerHTML = '';
+    iconEl.style.fontSize = '0.9rem';
+  }
+
   document.getElementById('serverName').textContent = guildName;
-  document.getElementById('serverIcon').textContent = '🏠';
 
   document.querySelectorAll('.dropdown-item').forEach(item => {
     item.classList.toggle('active', item.dataset.guildId === guildId);

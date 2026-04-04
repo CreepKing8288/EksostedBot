@@ -219,14 +219,42 @@ app.get('/api/guild/:guildId/leaderboard', requireAuth, async (req, res) => {
     const limit = 10;
     const skip = (page - 1) * limit;
     const sortField = type === 'vc' ? 'voiceSeconds' : 'totalXp';
+    const guildId = req.params.guildId;
 
-    const total = await MemberData.countDocuments({ guildId: req.params.guildId });
-    const top = await MemberData.find({ guildId: req.params.guildId })
-      .sort({ [sortField]: -1 })
-      .skip(skip)
-      .limit(limit);
+    let guildMemberIds = new Set();
+    if (DISCORD_BOT_TOKEN) {
+      try {
+        let after = null;
+        while (true) {
+          const url = `https://discord.com/api/guilds/${guildId}/members?limit=1000${after ? `&after=${after}` : ''}`;
+          const membersRes = await fetch(url, {
+            headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` }
+          });
+          if (!membersRes.ok) break;
+          const members = await membersRes.json();
+          if (members.length === 0) break;
+          members.forEach(m => guildMemberIds.add(m.user.id));
+          if (members.length < 1000) break;
+          after = members[members.length - 1].user.id;
+        }
+      } catch (e) {
+        console.error('Failed to fetch guild members:', e);
+      }
+    }
 
-    const userIds = top.map(m => m.userId);
+    let allMembers = await MemberData.find({ guildId }).sort({ [sortField]: -1 });
+    if (guildMemberIds.size > 0) {
+      const leftUsers = allMembers.filter(m => !guildMemberIds.has(m.userId));
+      if (leftUsers.length > 0) {
+        await MemberData.deleteMany({ guildId, userId: { $in: leftUsers.map(m => m.userId) } });
+        allMembers = allMembers.filter(m => guildMemberIds.has(m.userId));
+      }
+    }
+
+    const total = allMembers.length;
+    const paginated = allMembers.slice(skip, skip + limit);
+
+    const userIds = paginated.map(m => m.userId);
     let userMap = {};
     if (userIds.length > 0 && DISCORD_BOT_TOKEN) {
       const userPromises = userIds.map(async (uid) => {
@@ -249,7 +277,7 @@ app.get('/api/guild/:guildId/leaderboard', requireAuth, async (req, res) => {
       });
     }
 
-    const leaderboard = top.map((m, i) => {
+    const leaderboard = paginated.map((m, i) => {
       const u = userMap[m.userId] || {};
       return {
         rank: skip + i + 1,
