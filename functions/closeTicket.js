@@ -74,7 +74,7 @@ async function closeTicket(channel, closer, reason = 'No reason provided') {
     ticket.closeReason = reason;
     await ticket.save();
 
-    await channel.send('🔒 Closing ticket in 5 seconds...');
+    await channel.send(settings?.closeMessage || '🔒 Closing ticket in 5 seconds...');
 
     setTimeout(async () => {
       try {
