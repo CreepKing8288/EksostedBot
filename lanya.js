@@ -215,25 +215,62 @@ app.get('/api/guild/:guildId/leaderboard', requireAuth, async (req, res) => {
   try {
     const { MemberData } = require('./models/Level');
     const type = req.query.type || 'level';
+    const page = parseInt(req.query.page) || 1;
+    const limit = 10;
+    const skip = (page - 1) * limit;
     const sortField = type === 'vc' ? 'voiceSeconds' : 'totalXp';
 
+    const total = await MemberData.countDocuments({ guildId: req.params.guildId });
     const top = await MemberData.find({ guildId: req.params.guildId })
       .sort({ [sortField]: -1 })
-      .limit(25);
+      .skip(skip)
+      .limit(limit);
 
-    const leaderboard = top.map((m, i) => ({
-      rank: i + 1,
-      userId: m.userId,
-      username: `User ${m.userId}`,
-      avatar: null,
-      level: m.level,
-      xp: m.xp,
-      totalXp: m.totalXp,
-      voiceXp: m.voiceXp,
-      voiceSeconds: m.voiceSeconds,
-    }));
+    const userIds = top.map(m => m.userId);
+    let userMap = {};
+    if (userIds.length > 0 && DISCORD_BOT_TOKEN) {
+      const userPromises = userIds.map(async (uid) => {
+        try {
+          const userRes = await fetch(`https://discord.com/api/users/${uid}`, {
+            headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` }
+          });
+          if (userRes.ok) {
+            const u = await userRes.json();
+            return { id: uid, username: u.username, avatar: u.avatar, discriminator: u.discriminator };
+          }
+        } catch {}
+        return { id: uid };
+      });
+      const users = await Promise.allSettled(userPromises);
+      users.forEach(r => {
+        if (r.status === 'fulfilled' && r.value && r.value.username) {
+          userMap[r.value.id] = r.value;
+        }
+      });
+    }
 
-    res.json(leaderboard);
+    const leaderboard = top.map((m, i) => {
+      const u = userMap[m.userId] || {};
+      return {
+        rank: skip + i + 1,
+        userId: m.userId,
+        username: u.username || `User ${m.userId}`,
+        avatar: u.avatar || null,
+        discriminator: u.discriminator || '0',
+        level: m.level,
+        xp: m.xp,
+        totalXp: m.totalXp,
+        voiceXp: m.voiceXp,
+        voiceSeconds: m.voiceSeconds,
+      };
+    });
+
+    res.json({
+      leaderboard,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    });
   } catch (err) {
     console.error('Error fetching leaderboard:', err);
     res.status(500).json({ error: 'Failed to fetch leaderboard' });

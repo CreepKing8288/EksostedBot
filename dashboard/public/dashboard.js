@@ -1,5 +1,7 @@
 let currentGuildId = null;
 let userGuilds = [];
+let currentLbType = 'level';
+let currentLbPage = 1;
 
 // INIT
 document.addEventListener('DOMContentLoaded', async () => {
@@ -99,8 +101,7 @@ async function selectServer(guildId, guildName) {
   });
 
   await loadConfigs();
-  await loadLeaderboard('level');
-  await loadLeaderboard('vc');
+  await loadLeaderboard('level', 1);
   switchPanel('overview');
 }
 
@@ -557,17 +558,28 @@ async function saveButtonRole() {
   }
 }
 
-async function loadLeaderboard(type) {
+function changeLeaderboardType() {
+  currentLbType = document.getElementById('lbTypeSelect').value;
+  currentLbPage = 1;
+  loadLeaderboard(currentLbType, 1);
+}
+
+async function loadLeaderboard(type, page) {
   if (!currentGuildId) return;
-  const container = document.getElementById(type === 'vc' ? 'vc-leaderboard-list' : 'lvl-leaderboard-list');
+  currentLbType = type;
+  currentLbPage = page;
+  document.getElementById('lbTypeSelect').value = type;
+  const container = document.getElementById('lb-container');
+  const pagination = document.getElementById('lbPagination');
   container.innerHTML = '<p class="lb-loading">Loading...</p>';
+  pagination.innerHTML = '';
 
   try {
-    const res = await fetch(`/api/guild/${currentGuildId}/leaderboard?type=${type}`);
+    const res = await fetch(`/api/guild/${currentGuildId}/leaderboard?type=${type}&page=${page}`);
     if (!res.ok) throw new Error('Failed');
     const data = await res.json();
 
-    if (data.length === 0) {
+    if (data.leaderboard.length === 0) {
       container.innerHTML = '<p class="lb-empty">No data yet. Members need to chat/join VC to appear here.</p>';
       return;
     }
@@ -581,7 +593,7 @@ async function loadLeaderboard(type) {
     }
     html += '</tr></thead><tbody>';
 
-    data.forEach(entry => {
+    data.leaderboard.forEach(entry => {
       const rankClass = entry.rank === 1 ? 'gold' : entry.rank === 2 ? 'silver' : entry.rank === 3 ? 'bronze' : '';
       const avatarUrl = entry.avatar
         ? `https://cdn.discordapp.com/avatars/${entry.userId}/${entry.avatar}.png?size=32`
@@ -613,6 +625,19 @@ async function loadLeaderboard(type) {
 
     html += '</tbody></table>';
     container.innerHTML = html;
+
+    // Pagination
+    if (data.totalPages > 1) {
+      let pagHtml = '<div class="lb-pages">';
+      pagHtml += `<button class="lb-page-btn" ${page <= 1 ? 'disabled' : ''} onclick="loadLeaderboard('${type}', ${page - 1})">‹</button>`;
+      for (let p = 1; p <= data.totalPages; p++) {
+        pagHtml += `<button class="lb-page-btn ${p === page ? 'active' : ''}" onclick="loadLeaderboard('${type}', ${p})">${p}</button>`;
+      }
+      pagHtml += `<button class="lb-page-btn" ${page >= data.totalPages ? 'disabled' : ''} onclick="loadLeaderboard('${type}', ${page + 1})">›</button>`;
+      pagHtml += `<span class="lb-page-info">${data.total} members</span>`;
+      pagHtml += '</div>';
+      pagination.innerHTML = pagHtml;
+    }
   } catch (err) {
     console.error('Leaderboard error:', err);
     container.innerHTML = '<p class="lb-empty">Failed to load leaderboard.</p>';

@@ -34,7 +34,7 @@ module.exports = {
 
     const topMembers = leaderboard.slice(0, 10);
     const canvasWidth = 950;
-    const canvasHeight = 600;
+    const canvasHeight = 750;
     const canvas = createCanvas(canvasWidth, canvasHeight);
     const ctx = canvas.getContext('2d');
 

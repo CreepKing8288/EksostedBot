@@ -217,17 +217,19 @@
           </div>
 
           <div class="leaderboard-section">
-            <h2>Level Leaderboard</h2>
-            <div class="leaderboard-container" id="lvl-leaderboard-list">
+            <div class="lb-header">
+              <h2>Leaderboard</h2>
+              <div class="lb-controls">
+                <select class="lb-type-select" id="lbTypeSelect" onchange="changeLeaderboardType()">
+                  <option value="level">Level</option>
+                  <option value="vc">Voice</option>
+                </select>
+              </div>
+            </div>
+            <div class="leaderboard-container" id="lb-container">
               <p class="lb-loading">Loading...</p>
             </div>
-          </div>
-
-          <div class="leaderboard-section">
-            <h2>VC Leaderboard</h2>
-            <div class="leaderboard-container" id="vc-leaderboard-list">
-              <p class="lb-loading">Loading...</p>
-            </div>
+            <div class="lb-pagination" id="lbPagination"></div>
           </div>
         </div>
 
