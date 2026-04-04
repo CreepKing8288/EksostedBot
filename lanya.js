@@ -7,6 +7,7 @@ app.set('trust proxy', 1);
 
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
+const DISCORD_BOT_TOKEN = process.env.DISCORD_TOKEN;
 const DASHBOARD_PORT = process.env.DASHBOARD_PORT || process.env.PORT || 3000;
 const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `http://localhost:${DASHBOARD_PORT}/auth/callback`;
 const sessionSecret = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
@@ -83,12 +84,21 @@ app.get('/auth/callback', async (req, res) => {
       return res.status(500).send('Invalid guilds response');
     }
 
+    const botGuildsRes = await fetch('https://discord.com/api/users/@me/guilds', {
+      headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` },
+    });
+    const botGuilds = botGuildsRes.ok ? await botGuildsRes.json() : [];
+    const botGuildIds = new Set(botGuilds.map(bg => bg.id));
+
     req.session.user = {
       id: user.id,
       username: user.username,
       discriminator: user.discriminator,
       avatar: user.avatar,
-      guilds: guilds.filter(g => (BigInt(g.permissions) & 0x8n) === 0x8n),
+      guilds: guilds.filter(g => {
+        const hasManageGuild = (BigInt(g.permissions) & 0x8n) === 0x8n;
+        return hasManageGuild && botGuildIds.has(g.id);
+      }),
     };
 
     res.redirect('/dashboard');
