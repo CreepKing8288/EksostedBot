@@ -114,8 +114,11 @@ module.exports = {
         return;
       }
 
+      const authorMention = typeof message.author.toString === 'function' && message.author.username
+        ? message.author.toString()
+        : `<@${message.author.id}>`;
       await channel.send(
-        `${message.author.toString()} has leveled up to level **${level}**! 🎉`
+        `${authorMention} has leveled up to level **${level}**! 🎉`
       );
     } catch (err) {
       console.error('Level-up message failed:', err.message);
