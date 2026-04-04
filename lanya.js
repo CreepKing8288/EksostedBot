@@ -121,6 +121,51 @@ app.get('/api/guilds', requireAuth, (req, res) => {
   res.json(req.session.user.guilds);
 });
 
+app.get('/api/user/guilds', requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    const botGuilds = client.guilds.cache.map(g => g.id);
+    let userGuildIds = new Set();
+
+    if (DISCORD_BOT_TOKEN) {
+      try {
+        let after = null;
+        while (true) {
+          const url = `https://discord.com/api/users/@me/guilds?limit=200${after ? `&after=${after}` : ''}`;
+          const guildsRes = await fetch(url, {
+            headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` }
+          });
+          if (!guildsRes.ok) break;
+          const guilds = await guildsRes.json();
+          if (guilds.length === 0) break;
+          guilds.forEach(g => {
+            if (botGuilds.includes(g.id)) {
+              userGuildIds.add(g.id);
+            }
+          });
+          if (guilds.length < 200) break;
+          after = guilds[guilds.length - 1].id;
+        }
+      } catch (e) {
+        console.error('Failed to fetch user guilds:', e);
+      }
+    }
+
+    const guilds = client.guilds.cache
+      .filter(g => userGuildIds.has(g.id))
+      .map(g => ({
+        id: g.id,
+        name: g.name,
+        icon: g.icon,
+      }));
+
+    res.json(guilds);
+  } catch (err) {
+    console.error('Error fetching user guilds:', err);
+    res.status(500).json({ error: 'Failed to fetch guilds' });
+  }
+});
+
 app.get('/api/guild/:guildId/configs', requireAuth, async (req, res) => {
   try {
     const configs = {};

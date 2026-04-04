@@ -349,6 +349,7 @@
       <a href="http://discord.gg/7hZNYZbPbw" class="btn btn-secondary">Support</a>
       <a href="https://discord.com/oauth2/authorize?client_id=1488409951956369510&permissions=8&integration_type=0&scope=bot" class="btn btn-primary">Invite Bot</a>
       <a href="/dashboard" class="btn btn-secondary">Dashboard</a>
+      <a href="/auth/login" class="btn btn-secondary" id="loginBtn">Login</a>
     </div>
   </nav>
 
@@ -382,13 +383,52 @@
     let currentGuildId = null;
     let currentType = 'level';
     let currentPage = 1;
+    let isLoggedIn = false;
+    let userGuilds = [];
 
-    async function loadServers() {
+    async function init() {
       try {
-        const res = await fetch('/api/public/guilds');
+        const res = await fetch('/api/user');
+        if (res.ok) {
+          const user = await res.json();
+          isLoggedIn = true;
+          document.getElementById('loginBtn').textContent = user.username;
+          document.getElementById('loginBtn').href = '/dashboard';
+          loadUserServers();
+        } else {
+          document.getElementById('lbContainer').innerHTML = `
+            <div class="lb-empty">
+              <p>Please <a href="/auth/login" style="color: var(--accent-light); text-decoration: underline;">login with Discord</a> to view the leaderboard.</p>
+            </div>
+          `;
+          document.getElementById('serverSelect').style.display = 'none';
+          document.getElementById('typeSelect').style.display = 'none';
+        }
+      } catch {
+        document.getElementById('lbContainer').innerHTML = `
+          <div class="lb-empty">
+            <p>Please <a href="/auth/login" style="color: var(--accent-light); text-decoration: underline;">login with Discord</a> to view the leaderboard.</p>
+          </div>
+        `;
+        document.getElementById('serverSelect').style.display = 'none';
+        document.getElementById('typeSelect').style.display = 'none';
+      }
+    }
+
+    async function loadUserServers() {
+      try {
+        const res = await fetch('/api/user/guilds');
         if (!res.ok) return;
         const guilds = await res.json();
         const select = document.getElementById('serverSelect');
+        select.innerHTML = '<option value="">Select a server...</option>';
+        if (guilds.length === 0) {
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = 'No servers found';
+          opt.disabled = true;
+          select.appendChild(opt);
+        }
         guilds.forEach(g => {
           const opt = document.createElement('option');
           opt.value = g.id;
@@ -502,7 +542,7 @@
       return div.innerHTML;
     }
 
-    loadServers();
+    init();
   </script>
 </body>
 </html>
