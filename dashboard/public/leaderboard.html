@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eksosted BOT | Leaderboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #12121a;
+      --bg-card: #1a1a2e;
+      --bg-card-hover: #22223a;
+      --accent: #7c3aed;
+      --accent-light: #a78bfa;
+      --accent-glow: rgba(124, 58, 237, 0.3);
+      --text-primary: #f1f1f6;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --border: rgba(255, 255, 255, 0.06);
+      --green: #10b981;
+      --blue: #3b82f6;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+      --pink: #ec4899;
+      --cyan: #06b6d4;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    nav {
+      position: fixed;
+      top: 0;
+      width: 100%;
+      z-index: 100;
+      padding: 1rem 2rem;
+      background: rgba(10, 10, 15, 0.8);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .nav-logo {
+      font-size: 1.4rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent-light), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-decoration: none;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--text-primary); }
+
+    .nav-cta { display: flex; gap: 0.75rem; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.6rem 1.4rem;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+      cursor: pointer;
+      border: none;
+      font-family: inherit;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-light);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .lb-page {
+      padding: 6rem 2rem 4rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .lb-header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .lb-header h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+    }
+
+    .lb-header h1 .gradient {
+      background: linear-gradient(135deg, var(--accent-light), var(--pink), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .lb-header p {
+      color: var(--text-secondary);
+    }
+
+    .lb-controls {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .lb-server-select, .lb-type-select {
+      padding: 0.6rem 1rem;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text-primary);
+      font-size: 0.9rem;
+      font-family: inherit;
+      cursor: pointer;
+      outline: none;
+      min-width: 200px;
+    }
+
+    .lb-server-select:focus, .lb-type-select:focus {
+      border-color: var(--accent);
+    }
+
+    .lb-server-select option, .lb-type-select option {
+      background: var(--bg-card);
+      color: var(--text-primary);
+    }
+
+    .lb-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .lb-loading {
+      color: var(--text-muted);
+      text-align: center;
+      padding: 3rem;
+    }
+
+    .lb-empty {
+      color: var(--text-muted);
+      text-align: center;
+      padding: 3rem;
+    }
+
+    .lb-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .lb-table thead th {
+      text-align: left;
+      padding: 0.75rem 1rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .lb-table tbody tr {
+      transition: background 0.15s;
+    }
+
+    .lb-table tbody tr:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .lb-table tbody td {
+      padding: 0.75rem 1rem;
+      font-size: 0.85rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .lb-rank {
+      font-weight: 700;
+      width: 50px;
+    }
+
+    .lb-rank.gold { color: #fbbf24; }
+    .lb-rank.silver { color: #9ca3af; }
+    .lb-rank.bronze { color: #d97706; }
+
+    .lb-user {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .lb-user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex-shrink: 0;
+      background-size: cover;
+      background-position: center;
+    }
+
+    .lb-user-name {
+      font-weight: 600;
+    }
+
+    .lb-stat { color: var(--text-secondary); }
+    .lb-stat strong { color: var(--text-primary); font-weight: 700; }
+
+    .lb-pagination {
+      display: flex;
+      justify-content: center;
+    }
+
+    .lb-pages {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .lb-page-btn {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+
+    .lb-page-btn:hover:not(:disabled) {
+      background: rgba(124, 58, 237, 0.2);
+      border-color: var(--accent);
+    }
+
+    .lb-page-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+
+    .lb-page-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .lb-page-info {
+      margin-left: 0.75rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    footer {
+      text-align: center;
+      padding: 3rem 2rem;
+      border-top: 1px solid var(--border);
+      margin-top: 4rem;
+    }
+
+    footer p {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    footer a {
+      color: var(--accent-light);
+      text-decoration: none;
+    }
+
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .lb-controls { flex-direction: column; }
+      .lb-server-select, .lb-type-select { width: 100%; min-width: unset; }
+      .lb-table { font-size: 0.8rem; }
+      .lb-table thead th { font-size: 0.7rem; padding: 0.5rem; }
+      .lb-table tbody td { padding: 0.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/" class="nav-logo">Eksosted BOT</a>
+    <ul class="nav-links">
+      <li><a href="/">Home</a></li>
+      <li><a href="/leaderboard" style="color: var(--accent-light);">Leaderboard</a></li>
+      <li><a href="/dashboard">Dashboard</a></li>
+    </ul>
+    <div class="nav-cta">
+      <a href="http://discord.gg/7hZNYZbPbw" class="btn btn-secondary">Support</a>
+      <a href="https://discord.com/oauth2/authorize?client_id=1488409951956369510&permissions=8&integration_type=0&scope=bot" class="btn btn-primary">Invite Bot</a>
+      <a href="/dashboard" class="btn btn-secondary">Dashboard</a>
+    </div>
+  </nav>
+
+  <div class="lb-page">
+    <div class="lb-header">
+      <h1><span class="gradient">Leaderboard</span></h1>
+      <p>View the top players across all servers</p>
+    </div>
+
+    <div class="lb-controls">
+      <select class="lb-server-select" id="serverSelect" onchange="onServerChange()">
+        <option value="">Select a server...</option>
+      </select>
+      <select class="lb-type-select" id="typeSelect" onchange="onTypeChange()">
+        <option value="level">Level</option>
+        <option value="vc">Voice</option>
+      </select>
+    </div>
+
+    <div class="lb-container" id="lbContainer">
+      <p class="lb-loading">Select a server to view the leaderboard</p>
+    </div>
+    <div class="lb-pagination" id="lbPagination"></div>
+  </div>
+
+  <footer>
+    <p>Built with ❤️ for Discord communities &mdash; <a href="/">Eksosted BOT</a> &copy; 2025</p>
+  </footer>
+
+  <script>
+    let currentGuildId = null;
+    let currentType = 'level';
+    let currentPage = 1;
+
+    async function loadServers() {
+      try {
+        const res = await fetch('/api/public/guilds');
+        if (!res.ok) return;
+        const guilds = await res.json();
+        const select = document.getElementById('serverSelect');
+        guilds.forEach(g => {
+          const opt = document.createElement('option');
+          opt.value = g.id;
+          opt.textContent = g.name;
+          select.appendChild(opt);
+        });
+      } catch (e) {
+        console.error('Failed to load servers:', e);
+      }
+    }
+
+    function onServerChange() {
+      currentGuildId = document.getElementById('serverSelect').value;
+      currentPage = 1;
+      if (currentGuildId) loadLeaderboard();
+      else {
+        document.getElementById('lbContainer').innerHTML = '<p class="lb-loading">Select a server to view the leaderboard</p>';
+        document.getElementById('lbPagination').innerHTML = '';
+      }
+    }
+
+    function onTypeChange() {
+      currentType = document.getElementById('typeSelect').value;
+      currentPage = 1;
+      if (currentGuildId) loadLeaderboard();
+    }
+
+    async function loadLeaderboard() {
+      if (!currentGuildId) return;
+      const container = document.getElementById('lbContainer');
+      const pagination = document.getElementById('lbPagination');
+      container.innerHTML = '<p class="lb-loading">Loading...</p>';
+      pagination.innerHTML = '';
+
+      try {
+        const res = await fetch(`/api/public/guild/${currentGuildId}/leaderboard?type=${currentType}&page=${currentPage}`);
+        if (!res.ok) throw new Error('Failed');
+        const data = await res.json();
+
+        if (data.leaderboard.length === 0) {
+          container.innerHTML = '<p class="lb-empty">No data yet. Members need to chat/join VC to appear here.</p>';
+          return;
+        }
+
+        let html = '<table class="lb-table"><thead><tr>';
+        html += '<th>#</th><th>User</th>';
+        if (currentType === 'vc') {
+          html += '<th>VC Time</th><th>Voice XP</th>';
+        } else {
+          html += '<th>Level</th><th>Total XP</th><th>Voice XP</th>';
+        }
+        html += '</tr></thead><tbody>';
+
+        data.leaderboard.forEach(entry => {
+          const rankClass = entry.rank === 1 ? 'gold' : entry.rank === 2 ? 'silver' : entry.rank === 3 ? 'bronze' : '';
+          const avatarUrl = entry.avatar
+            ? `https://cdn.discordapp.com/avatars/${entry.userId}/${entry.avatar}.png?size=32`
+            : '';
+
+          html += `<tr>`;
+          html += `<td class="lb-rank ${rankClass}">${entry.rank}</td>`;
+          html += `<td><div class="lb-user">`;
+          if (avatarUrl) {
+            html += `<div class="lb-user-avatar" style="background-image: url(${avatarUrl})"></div>`;
+          } else {
+            html += `<div class="lb-user-avatar"></div>`;
+          }
+          html += `<span class="lb-user-name">${escapeHtml(entry.username)}</span>`;
+          html += `</div></td>`;
+
+          if (currentType === 'vc') {
+            const hours = Math.floor(entry.voiceSeconds / 3600);
+            const minutes = Math.floor((entry.voiceSeconds % 3600) / 60);
+            html += `<td class="lb-stat">${hours}h ${minutes}m</td>`;
+            html += `<td class="lb-stat"><strong>${Math.floor(entry.voiceXp)}</strong></td>`;
+          } else {
+            html += `<td class="lb-stat"><strong>${entry.level}</strong></td>`;
+            html += `<td class="lb-stat"><strong>${Math.floor(entry.totalXp)}</strong></td>`;
+            html += `<td class="lb-stat">${Math.floor(entry.voiceXp)}</td>`;
+          }
+          html += `</tr>`;
+        });
+
+        html += '</tbody></table>';
+        container.innerHTML = html;
+
+        if (data.totalPages > 1) {
+          let pagHtml = '<div class="lb-pages">';
+          pagHtml += `<button class="lb-page-btn" ${currentPage <= 1 ? 'disabled' : ''} onclick="goPage(${currentPage - 1})">‹</button>`;
+          for (let p = 1; p <= data.totalPages; p++) {
+            pagHtml += `<button class="lb-page-btn ${p === currentPage ? 'active' : ''}" onclick="goPage(${p})">${p}</button>`;
+          }
+          pagHtml += `<button class="lb-page-btn" ${currentPage >= data.totalPages ? 'disabled' : ''} onclick="goPage(${currentPage + 1})">›</button>`;
+          pagHtml += `<span class="lb-page-info">${data.total} members</span>`;
+          pagHtml += '</div>';
+          pagination.innerHTML = pagHtml;
+        }
+      } catch (err) {
+        container.innerHTML = '<p class="lb-empty">Failed to load leaderboard.</p>';
+      }
+    }
+
+    function goPage(p) {
+      currentPage = p;
+      loadLeaderboard();
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    loadServers();
+  </script>
+</body>
+</html>

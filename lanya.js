@@ -96,8 +96,8 @@ app.get('/auth/callback', async (req, res) => {
       discriminator: user.discriminator,
       avatar: user.avatar,
       guilds: guilds.filter(g => {
-        const hasManageGuild = (BigInt(g.permissions) & 0x8n) === 0x8n;
-        return hasManageGuild && botGuildIds.has(g.id);
+        const isAdmin = g.owner || (BigInt(g.permissions) & 0x8n) === 0x8n;
+        return isAdmin && botGuildIds.has(g.id);
       }),
     };
 
@@ -309,8 +309,102 @@ app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard', 'public', 'dashboard.html'));
 });
 
+app.get('/leaderboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dashboard', 'public', 'leaderboard.html'));
+});
+
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dashboard', 'public', 'dashboard.html'));
+  res.sendFile(path.join(__dirname, 'website', 'index.html'));
+});
+
+// Public API - no auth required
+app.get('/api/public/guilds', async (req, res) => {
+  try {
+    const guilds = client.guilds.cache.map(g => ({
+      id: g.id,
+      name: g.name,
+      icon: g.icon,
+      memberCount: g.memberCount,
+    }));
+    res.json(guilds);
+  } catch (err) {
+    console.error('Error fetching public guilds:', err);
+    res.status(500).json({ error: 'Failed to fetch guilds' });
+  }
+});
+
+app.get('/api/public/guild/:guildId/leaderboard', async (req, res) => {
+  try {
+    const { MemberData } = require('./models/Level');
+    const type = req.query.type || 'level';
+    const page = parseInt(req.query.page) || 1;
+    const limit = 10;
+    const skip = (page - 1) * limit;
+    const sortField = type === 'vc' ? 'voiceSeconds' : 'totalXp';
+    const guildId = req.params.guildId;
+
+    const guild = client.guilds.cache.get(guildId);
+    if (!guild) {
+      return res.status(404).json({ error: 'Guild not found' });
+    }
+
+    let allMembers = await MemberData.find({ guildId }).sort({ [sortField]: -1 });
+    const guildMemberIds = new Set(guild.members.cache.map(m => m.id));
+    const leftUsers = allMembers.filter(m => !guildMemberIds.has(m.userId));
+    if (leftUsers.length > 0) {
+      await MemberData.deleteMany({ guildId, userId: { $in: leftUsers.map(m => m.userId) } });
+      allMembers = allMembers.filter(m => guildMemberIds.has(m.userId));
+    }
+
+    const total = allMembers.length;
+    const paginated = allMembers.slice(skip, skip + limit);
+
+    const userIds = paginated.map(m => m.userId);
+    let userMap = {};
+    if (userIds.length > 0) {
+      const userPromises = userIds.map(async (uid) => {
+        try {
+          const user = await client.users.fetch(uid, { force: false });
+          if (user) {
+            return { id: uid, username: user.username, avatar: user.avatar, discriminator: user.discriminator };
+          }
+        } catch {}
+        return { id: uid };
+      });
+      const users = await Promise.allSettled(userPromises);
+      users.forEach(r => {
+        if (r.status === 'fulfilled' && r.value && r.value.username) {
+          userMap[r.value.id] = r.value;
+        }
+      });
+    }
+
+    const leaderboard = paginated.map((m, i) => {
+      const u = userMap[m.userId] || {};
+      return {
+        rank: skip + i + 1,
+        userId: m.userId,
+        username: u.username || `User ${m.userId}`,
+        avatar: u.avatar || null,
+        discriminator: u.discriminator || '0',
+        level: m.level,
+        xp: m.xp,
+        totalXp: m.totalXp,
+        voiceXp: m.voiceXp,
+        voiceSeconds: m.voiceSeconds,
+      };
+    });
+
+    res.json({
+      leaderboard,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (err) {
+    console.error('Error fetching public leaderboard:', err);
+    res.status(500).json({ error: 'Failed to fetch leaderboard' });
+  }
 });
 
 app.listen(DASHBOARD_PORT, () => {
