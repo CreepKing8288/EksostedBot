@@ -358,7 +358,7 @@
       <a href="http://discord.gg/7hZNYZbPbw" class="btn btn-secondary">Support</a>
       <a href="https://discord.com/oauth2/authorize?client_id=1488409951956369510&permissions=8&integration_type=0&scope=bot" class="btn btn-primary">Invite Bot</a>
       <a href="/dashboard" class="btn btn-secondary">Dashboard</a>
-      <a href="/auth/login" class="btn btn-secondary" id="loginBtn">Login</a>
+      <a href="/auth/login?return=/leaderboard" class="btn btn-secondary" id="loginBtn">Login</a>
     </div>
   </nav>
 
@@ -407,7 +407,7 @@
         } else {
           document.getElementById('lbContainer').innerHTML = `
             <div class="lb-empty">
-              <p>Please <a href="/auth/login" style="color: var(--accent-light); text-decoration: underline;">login with Discord</a> to view the leaderboard.</p>
+              <p>Please <a href="/auth/login?return=/leaderboard" style="color: var(--accent-light); text-decoration: underline;">login with Discord</a> to view the leaderboard.</p>
             </div>
           `;
           document.getElementById('serverSelect').style.display = 'none';
@@ -416,7 +416,7 @@
       } catch {
         document.getElementById('lbContainer').innerHTML = `
           <div class="lb-empty">
-            <p>Please <a href="/auth/login" style="color: var(--accent-light); text-decoration: underline;">login with Discord</a> to view the leaderboard.</p>
+            <p>Please <a href="/auth/login?return=/leaderboard" style="color: var(--accent-light); text-decoration: underline;">login with Discord</a> to view the leaderboard.</p>
           </div>
         `;
         document.getElementById('serverSelect').style.display = 'none';

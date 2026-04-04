@@ -28,18 +28,29 @@ const requireAuth = (req, res, next) => {
 };
 
 app.get('/auth/login', (req, res) => {
+  const returnUrl = req.query.return || '/dashboard';
+  const state = Buffer.from(JSON.stringify({ return: returnUrl })).toString('base64');
   const params = new URLSearchParams({
     client_id: DISCORD_CLIENT_ID,
     redirect_uri: DISCORD_REDIRECT_URI,
     response_type: 'code',
     scope: 'identify guilds',
+    state,
   });
   res.redirect(`https://discord.com/api/oauth2/authorize?${params}`);
 });
 
 app.get('/auth/callback', async (req, res) => {
-  const { code } = req.query;
+  const { code, state } = req.query;
   if (!code) return res.redirect('/');
+
+  let returnUrl = '/dashboard';
+  if (state) {
+    try {
+      const parsed = JSON.parse(Buffer.from(state, 'base64').toString());
+      if (parsed.return) returnUrl = parsed.return;
+    } catch {}
+  }
 
   try {
     const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
@@ -101,7 +112,7 @@ app.get('/auth/callback', async (req, res) => {
       }),
     };
 
-    res.redirect('/dashboard');
+    res.redirect(returnUrl);
   } catch (err) {
     console.error('OAuth error:', err.message, err.stack);
     res.status(500).send(`OAuth error: ${err.message}`);
