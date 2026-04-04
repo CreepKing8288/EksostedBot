@@ -116,6 +116,14 @@ async function loadConfigs() {
     populateStarboard(configs.Starboard);
     populateCrates(configs.CrateConfig);
     populateTickets(configs.TicketSettings);
+    populateLeveling(configs.Level);
+    populateWelcome(configs.welcome);
+    populateAIChat(configs.AIChatConfig);
+    populateProtection(configs.ProtectionSettings);
+    populateServerLogs(configs.ServerLog);
+    populateAutoRoles(configs.AutoRole);
+    populateButtonRole(configs.ButtonRole);
+    populateServerStatus(configs.ServerStatus);
     updateOverview(configs);
   } catch (err) {
     console.error('Failed to load configs:', err);
@@ -172,6 +180,88 @@ function populateTickets(data) {
   document.getElementById('ticket-close').value = data?.closeMessage || '';
 }
 
+function populateLeveling(data) {
+  document.getElementById('level-enabled').checked = data?.levelingEnabled ?? true;
+  document.getElementById('level-xprate').value = data?.xpRate || 1;
+  document.getElementById('level-startingxp').value = data?.startingXp || 1000;
+  document.getElementById('level-xpperlevel').value = data?.xpPerLevel || 500;
+  document.getElementById('level-style').value = data?.leaderboardUpdateStyle || 'image';
+  document.getElementById('level-upchannel').value = data?.levelUpChannelId || '';
+  document.getElementById('level-lbchannel').value = data?.leaderboardChannelId || '';
+  document.getElementById('level-banner').value = data?.leaderboardBannerUrl || '';
+}
+
+function populateWelcome(data) {
+  document.getElementById('welcome-enabled').checked = data?.enabled || false;
+  document.getElementById('welcome-channel').value = data?.channelId || '';
+  document.getElementById('welcome-message').value = data?.description || '';
+}
+
+function populateAIChat(data) {
+  document.getElementById('aichat-enabled').checked = data?.enabled || false;
+  document.getElementById('aichat-channels').value = data?.channels?.join(', ') || '';
+  document.getElementById('aichat-timeout').value = data?.quietTimeoutMinutes || 30;
+  document.getElementById('aichat-personality').value = data?.personality || '';
+}
+
+function populateProtection(data) {
+  document.getElementById('prot-antibot').checked = data?.antiBot || false;
+  document.getElementById('prot-antinuke').checked = data?.antiNuke || false;
+  document.getElementById('prot-antiraid').checked = data?.antiRaid || false;
+  document.getElementById('prot-antibot-thresh').value = data?.antiBotThreshold || 3;
+  document.getElementById('prot-antinuke-thresh').value = data?.antiNukeThreshold || 3;
+  document.getElementById('prot-antiraid-thresh').value = data?.antiRaidThreshold || 5;
+  document.getElementById('prot-antiraid-time').value = data?.antiRaidTimeWindow || 10000;
+  document.getElementById('prot-punishment').value = data?.punishment || 'ban';
+  document.getElementById('prot-whitelist').value = data?.whitelistedUsers?.join(', ') || '';
+}
+
+function populateServerLogs(data) {
+  document.getElementById('logs-channel').value = data?.logChannel || '';
+  document.getElementById('logs-messages').checked = data?.categories?.messages || false;
+  document.getElementById('logs-nicknames').checked = data?.categories?.nicknames || false;
+  document.getElementById('logs-members').checked = data?.categories?.memberEvents || false;
+  document.getElementById('logs-channels').checked = data?.categories?.channelEvents || false;
+  document.getElementById('logs-roles').checked = data?.categories?.roleEvents || false;
+  document.getElementById('logs-voice').checked = data?.categories?.voiceEvents || false;
+  document.getElementById('logs-threads').checked = data?.categories?.threadEvents || false;
+  document.getElementById('logs-boosts').checked = data?.categories?.boosts || false;
+}
+
+function populateAutoRoles(data) {
+  document.getElementById('autoroles-roles').value = data?.roleIds?.join(', ') || '';
+}
+
+function populateButtonRole(data) {
+  if (data && data.length > 0) {
+    const p = data[0];
+    document.getElementById('btnrole-panelname').value = p.panelName || '';
+    document.getElementById('btnrole-description').value = p.panelData?.description || '';
+    document.getElementById('btnrole-channel').value = p.channelId || '';
+    document.getElementById('btnrole-buttons').value = JSON.stringify(p.buttons, null, 2);
+  } else {
+    document.getElementById('btnrole-panelname').value = '';
+    document.getElementById('btnrole-description').value = '';
+    document.getElementById('btnrole-channel').value = '';
+    document.getElementById('btnrole-buttons').value = '';
+  }
+}
+
+function populateServerStatus(data) {
+  if (data && data.length > 0) {
+    const s = data[0];
+    document.getElementById('srvstatus-name').value = s.serverName || '';
+    document.getElementById('srvstatus-ip').value = s.serverIp || '';
+    document.getElementById('srvstatus-mode').value = s.gameMode || 'java';
+    document.getElementById('srvstatus-channel').value = s.channelId || '';
+  } else {
+    document.getElementById('srvstatus-name').value = '';
+    document.getElementById('srvstatus-ip').value = '';
+    document.getElementById('srvstatus-mode').value = 'java';
+    document.getElementById('srvstatus-channel').value = '';
+  }
+}
+
 function updateOverview(configs) {
   const set = (id, val, onText, offText) => {
     const el = document.getElementById(id);
@@ -184,6 +274,13 @@ function updateOverview(configs) {
   set('stat-starboard', configs.Starboard?.enabled, 'Enabled', 'Disabled');
   set('stat-crates', configs.CrateConfig?.enabled, 'Enabled', 'Disabled');
   set('stat-tickets', configs.TicketSettings?.enabled, 'Enabled', 'Disabled');
+  set('stat-leveling', configs.Level?.levelingEnabled !== false, 'Enabled', 'Disabled');
+  set('stat-welcome', configs.welcome?.enabled, 'Enabled', 'Disabled');
+  set('stat-aichat', configs.AIChatConfig?.enabled, 'Enabled', 'Disabled');
+  const prot = configs.ProtectionSettings;
+  set('stat-protection', prot?.antiBot || prot?.antiNuke || prot?.antiRaid, 'Enabled', 'Disabled');
+  set('stat-logs', configs.ServerLog?.logChannel, 'Configured', 'Disabled');
+  set('stat-autoroles', configs.AutoRole?.roleIds?.length > 0, 'Active', 'Disabled');
 }
 
 async function saveConfig(modelName) {
@@ -257,6 +354,61 @@ async function saveConfig(modelName) {
         closeMessage: document.getElementById('ticket-close').value,
       };
       break;
+
+    case 'Level':
+      payload = {
+        guildId: currentGuildId,
+        levelingEnabled: document.getElementById('level-enabled').checked,
+        xpRate: parseFloat(document.getElementById('level-xprate').value),
+        startingXp: parseInt(document.getElementById('level-startingxp').value),
+        xpPerLevel: parseInt(document.getElementById('level-xpperlevel').value),
+        leaderboardUpdateStyle: document.getElementById('level-style').value,
+        levelUpChannelId: document.getElementById('level-upchannel').value,
+        leaderboardChannelId: document.getElementById('level-lbchannel').value,
+        leaderboardBannerUrl: document.getElementById('level-banner').value,
+      };
+      break;
+
+    case 'AIChatConfig':
+      payload = {
+        enabled: document.getElementById('aichat-enabled').checked,
+        channels: document.getElementById('aichat-channels').value
+          .split(',').map(c => c.trim()).filter(c => c),
+        quietTimeoutMinutes: parseInt(document.getElementById('aichat-timeout').value),
+        personality: document.getElementById('aichat-personality').value,
+      };
+      break;
+
+    case 'ProtectionSettings':
+      payload = {
+        antiBot: document.getElementById('prot-antibot').checked,
+        antiNuke: document.getElementById('prot-antinuke').checked,
+        antiRaid: document.getElementById('prot-antiraid').checked,
+        antiBotThreshold: parseInt(document.getElementById('prot-antibot-thresh').value),
+        antiNukeThreshold: parseInt(document.getElementById('prot-antinuke-thresh').value),
+        antiRaidThreshold: parseInt(document.getElementById('prot-antiraid-thresh').value),
+        antiRaidTimeWindow: parseInt(document.getElementById('prot-antiraid-time').value),
+        punishment: document.getElementById('prot-punishment').value,
+        whitelistedUsers: document.getElementById('prot-whitelist').value
+          .split(',').map(u => u.trim()).filter(u => u),
+      };
+      break;
+
+    case 'ServerLog':
+      payload = {
+        logChannel: document.getElementById('logs-channel').value,
+        categories: {
+          messages: document.getElementById('logs-messages').checked,
+          nicknames: document.getElementById('logs-nicknames').checked,
+          memberEvents: document.getElementById('logs-members').checked,
+          channelEvents: document.getElementById('logs-channels').checked,
+          roleEvents: document.getElementById('logs-roles').checked,
+          voiceEvents: document.getElementById('logs-voice').checked,
+          threadEvents: document.getElementById('logs-threads').checked,
+          boosts: document.getElementById('logs-boosts').checked,
+        },
+      };
+      break;
   }
 
   try {
@@ -293,6 +445,16 @@ function switchPanel(panelName) {
     starboard: 'Starboard',
     crates: 'Crate Drops',
     tickets: 'Ticket Settings',
+    leveling: 'Level Settings',
+    'lvl-leaderboard': 'Level Leaderboard',
+    'vc-leaderboard': 'VC Leaderboard',
+    welcome: 'Welcome Messages',
+    aichat: 'AI Chat',
+    protection: 'Protection',
+    serverlogs: 'Server Logs',
+    autoroles: 'Auto Roles',
+    buttonroles: 'Button Roles',
+    serverstatus: 'Server Status',
   };
 
   document.getElementById('topbarTitle').textContent = titles[panelName] || 'Dashboard';
@@ -311,4 +473,166 @@ function showToast(message, type = 'success') {
   toast.textContent = message;
   toast.className = `toast ${type} show`;
   setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+async function saveWelcome() {
+  if (!currentGuildId) return showToast('No server selected', 'error');
+  const payload = {
+    guildId: currentGuildId,
+    enabled: document.getElementById('welcome-enabled').checked,
+    channelId: document.getElementById('welcome-channel').value,
+    description: document.getElementById('welcome-message').value,
+  };
+  try {
+    const res = await fetch(`/api/guild/${currentGuildId}/config/Welcome`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Failed to save');
+    showToast('Settings saved successfully!', 'success');
+    await loadConfigs();
+  } catch {
+    showToast('Failed to save settings', 'error');
+  }
+}
+
+async function saveAutoRoles() {
+  if (!currentGuildId) return showToast('No server selected', 'error');
+  const payload = {
+    guildId: currentGuildId,
+    roleIds: document.getElementById('autoroles-roles').value
+      .split(',').map(r => r.trim()).filter(r => r),
+  };
+  try {
+    const res = await fetch(`/api/guild/${currentGuildId}/config/AutoRole`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Failed to save');
+    showToast('Settings saved successfully!', 'success');
+    await loadConfigs();
+  } catch {
+    showToast('Failed to save settings', 'error');
+  }
+}
+
+async function saveButtonRole() {
+  if (!currentGuildId) return showToast('No server selected', 'error');
+  let buttons;
+  try {
+    buttons = JSON.parse(document.getElementById('btnrole-buttons').value || '[]');
+  } catch {
+    return showToast('Invalid JSON for buttons', 'error');
+  }
+  const payload = {
+    guildId: currentGuildId,
+    panelName: document.getElementById('btnrole-panelname').value,
+    panelData: { description: document.getElementById('btnrole-description').value },
+    channelId: document.getElementById('btnrole-channel').value,
+    buttons,
+  };
+  try {
+    const res = await fetch(`/api/guild/${currentGuildId}/config/ButtonRole`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Failed to save');
+    showToast('Button role panel saved! Use the command to send it.', 'success');
+    await loadConfigs();
+  } catch {
+    showToast('Failed to save settings', 'error');
+  }
+}
+
+async function saveServerStatus() {
+  if (!currentGuildId) return showToast('No server selected', 'error');
+  const payload = {
+    guildId: currentGuildId,
+    serverName: document.getElementById('srvstatus-name').value,
+    serverIp: document.getElementById('srvstatus-ip').value,
+    gameMode: document.getElementById('srvstatus-mode').value,
+    channelId: document.getElementById('srvstatus-channel').value,
+  };
+  try {
+    const res = await fetch(`/api/guild/${currentGuildId}/config/ServerStatus`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Failed to save');
+    showToast('Settings saved successfully!', 'success');
+    await loadConfigs();
+  } catch {
+    showToast('Failed to save settings', 'error');
+  }
+}
+
+async function loadLeaderboard(type) {
+  if (!currentGuildId) return showToast('No server selected', 'error');
+  const container = document.getElementById(type === 'vc' ? 'vc-leaderboard-list' : 'lvl-leaderboard-list');
+  container.innerHTML = '<p class="lb-loading">Loading...</p>';
+
+  try {
+    const res = await fetch(`/api/guild/${currentGuildId}/leaderboard?type=${type}`);
+    if (!res.ok) throw new Error('Failed');
+    const data = await res.json();
+
+    if (data.length === 0) {
+      container.innerHTML = '<p class="lb-empty">No data yet. Members need to chat/join VC to appear here.</p>';
+      return;
+    }
+
+    let html = '<table class="lb-table"><thead><tr>';
+    html += '<th>#</th><th>User</th>';
+    if (type === 'vc') {
+      html += '<th>VC Time</th><th>Voice XP</th>';
+    } else {
+      html += '<th>Level</th><th>Total XP</th><th>Voice XP</th>';
+    }
+    html += '</tr></thead><tbody>';
+
+    data.forEach(entry => {
+      const rankClass = entry.rank === 1 ? 'gold' : entry.rank === 2 ? 'silver' : entry.rank === 3 ? 'bronze' : '';
+      const avatarUrl = entry.avatar
+        ? `https://cdn.discordapp.com/avatars/${entry.userId}/${entry.avatar}.png?size=32`
+        : '';
+
+      html += `<tr>`;
+      html += `<td class="lb-rank ${rankClass}">${entry.rank}</td>`;
+      html += `<td><div class="lb-user">`;
+      if (avatarUrl) {
+        html += `<div class="lb-user-avatar" style="background-image: url(${avatarUrl})"></div>`;
+      } else {
+        html += `<div class="lb-user-avatar"></div>`;
+      }
+      html += `<span class="lb-user-name">${escapeHtml(entry.username)}</span>`;
+      html += `</div></td>`;
+
+      if (type === 'vc') {
+        const hours = Math.floor(entry.voiceSeconds / 3600);
+        const minutes = Math.floor((entry.voiceSeconds % 3600) / 60);
+        html += `<td class="lb-stat">${hours}h ${minutes}m</td>`;
+        html += `<td class="lb-stat"><strong>${Math.floor(entry.voiceXp)}</strong></td>`;
+      } else {
+        html += `<td class="lb-stat"><strong>${entry.level}</strong></td>`;
+        html += `<td class="lb-stat"><strong>${Math.floor(entry.totalXp)}</strong></td>`;
+        html += `<td class="lb-stat">${Math.floor(entry.voiceXp)}</td>`;
+      }
+      html += `</tr>`;
+    });
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  } catch {
+    container.innerHTML = '<p class="lb-empty">Failed to load leaderboard.</p>';
+  }
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }

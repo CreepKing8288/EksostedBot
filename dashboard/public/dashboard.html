@@ -66,6 +66,44 @@
             <span class="nav-icon">🎫</span> Ticket Settings
           </a>
         </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Leveling</div>
+          <a href="#" class="nav-item" data-panel="leveling">
+            <span class="nav-icon">📈</span> Level Settings
+          </a>
+          <a href="#" class="nav-item" data-panel="lvl-leaderboard">
+            <span class="nav-icon">🏆</span> Level Leaderboard
+          </a>
+          <a href="#" class="nav-item" data-panel="vc-leaderboard">
+            <span class="nav-icon">🎤</span> VC Leaderboard
+          </a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Settings</div>
+          <a href="#" class="nav-item" data-panel="welcome">
+            <span class="nav-icon">👋</span> Welcome
+          </a>
+          <a href="#" class="nav-item" data-panel="aichat">
+            <span class="nav-icon">🤖</span> AI Chat
+          </a>
+          <a href="#" class="nav-item" data-panel="protection">
+            <span class="nav-icon">🛡️</span> Protection
+          </a>
+          <a href="#" class="nav-item" data-panel="serverlogs">
+            <span class="nav-icon">📋</span> Server Logs
+          </a>
+          <a href="#" class="nav-item" data-panel="autoroles">
+            <span class="nav-icon">🏷️</span> Auto Roles
+          </a>
+          <a href="#" class="nav-item" data-panel="buttonroles">
+            <span class="nav-icon">🔘</span> Button Roles
+          </a>
+          <a href="#" class="nav-item" data-panel="serverstatus">
+            <span class="nav-icon">🎮</span> Server Status
+          </a>
+        </div>
       </nav>
 
       <div class="sidebar-footer">
@@ -136,6 +174,48 @@
               <div class="stat-info">
                 <div class="stat-label">Tickets</div>
                 <div class="stat-value" id="stat-tickets">Disabled</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon" style="background: rgba(34, 197, 94, 0.1); color: #22c55e;">📈</div>
+              <div class="stat-info">
+                <div class="stat-label">Leveling</div>
+                <div class="stat-value" id="stat-leveling">Disabled</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon" style="background: rgba(168, 85, 247, 0.1); color: #a855f7;">👋</div>
+              <div class="stat-info">
+                <div class="stat-label">Welcome</div>
+                <div class="stat-value" id="stat-welcome">Disabled</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1); color: #60a5fa;">🤖</div>
+              <div class="stat-info">
+                <div class="stat-label">AI Chat</div>
+                <div class="stat-value" id="stat-aichat">Disabled</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon" style="background: rgba(239, 68, 68, 0.1); color: #f87171;">🛡️</div>
+              <div class="stat-info">
+                <div class="stat-label">Protection</div>
+                <div class="stat-value" id="stat-protection">Disabled</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon" style="background: rgba(107, 114, 128, 0.1); color: #9ca3af;">📋</div>
+              <div class="stat-info">
+                <div class="stat-label">Server Logs</div>
+                <div class="stat-value" id="stat-logs">Disabled</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon" style="background: rgba(251, 191, 36, 0.1); color: #fbbf24;">🏷️</div>
+              <div class="stat-info">
+                <div class="stat-label">Auto Roles</div>
+                <div class="stat-value" id="stat-autoroles">Disabled</div>
               </div>
             </div>
           </div>
@@ -427,6 +507,401 @@
               <input type="text" class="form-input" id="ticket-close" placeholder="Message shown before closing">
             </div>
             <button class="btn btn-primary" onclick="saveConfig('TicketSettings')">Save Changes</button>
+          </div>
+        </div>
+
+        <!-- LEVELING PANEL -->
+        <div class="panel" id="panel-leveling">
+          <div class="panel-header">
+            <h2>Level Settings</h2>
+            <p>Configure XP rate, level-up announcements, and leaderboard channels.</p>
+          </div>
+          <div class="card">
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Enable Leveling</div>
+                <div class="toggle-desc">Allow users to earn XP and level up.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="level-enabled">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">XP Rate (multiplier)</label>
+                <input type="number" class="form-input" id="level-xprate" min="0.1" step="0.1" value="1">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Starting XP</label>
+                <input type="number" class="form-input" id="level-startingxp" min="0" value="1000">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">XP Per Level</label>
+                <input type="number" class="form-input" id="level-xpperlevel" min="100" value="500">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Leaderboard Style</label>
+                <select class="form-select" id="level-style">
+                  <option value="image">Image</option>
+                  <option value="embed">Embed</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Level-Up Channel ID</label>
+                <input type="text" class="form-input" id="level-upchannel" placeholder="Channel for level-up messages">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Leaderboard Channel ID</label>
+                <input type="text" class="form-input" id="level-lbchannel" placeholder="Channel for hourly leaderboard">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Leaderboard Banner URL</label>
+              <input type="text" class="form-input" id="level-banner" placeholder="https://example.com/banner.png">
+            </div>
+            <button class="btn btn-primary" onclick="saveConfig('Level')">Save Changes</button>
+          </div>
+        </div>
+
+        <!-- LEVEL LEADERBOARD PANEL -->
+        <div class="panel" id="panel-lvl-leaderboard">
+          <div class="panel-header">
+            <h2>Level Leaderboard</h2>
+            <p>Top members by total XP in this server.</p>
+          </div>
+          <div class="card">
+            <div class="leaderboard-container" id="lvl-leaderboard-list">
+              <p class="lb-loading">Click "Refresh" to load leaderboard</p>
+            </div>
+            <button class="btn btn-primary" onclick="loadLeaderboard('level')">Refresh</button>
+          </div>
+        </div>
+
+        <!-- VC LEADERBOARD PANEL -->
+        <div class="panel" id="panel-vc-leaderboard">
+          <div class="panel-header">
+            <h2>VC Leaderboard</h2>
+            <p>Top members by voice channel time.</p>
+          </div>
+          <div class="card">
+            <div class="leaderboard-container" id="vc-leaderboard-list">
+              <p class="lb-loading">Click "Refresh" to load leaderboard</p>
+            </div>
+            <button class="btn btn-primary" onclick="loadLeaderboard('vc')">Refresh</button>
+          </div>
+        </div>
+
+        <!-- WELCOME PANEL -->
+        <div class="panel" id="panel-welcome">
+          <div class="panel-header">
+            <h2>Welcome Messages</h2>
+            <p>Configure welcome messages for new members.</p>
+          </div>
+          <div class="card">
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Enable Welcome Messages</div>
+                <div class="toggle-desc">Send a message when new members join.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="welcome-enabled">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Welcome Channel ID</label>
+              <input type="text" class="form-input" id="welcome-channel" placeholder="Channel ID for welcome messages">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Welcome Message</label>
+              <textarea class="form-textarea" id="welcome-message" placeholder="Use {member} and {server} as placeholders"></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="saveWelcome()">Save Changes</button>
+          </div>
+        </div>
+
+        <!-- AI CHAT PANEL -->
+        <div class="panel" id="panel-aichat">
+          <div class="panel-header">
+            <h2>AI Chat</h2>
+            <p>Configure AI-powered chat channels.</p>
+          </div>
+          <div class="card">
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Enable AI Chat</div>
+                <div class="toggle-desc">Allow AI to respond in configured channels.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="aichat-enabled">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="form-group">
+              <label class="form-label">AI Channels</label>
+              <input type="text" class="form-input" id="aichat-channels" placeholder="Channel IDs separated by commas">
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Quiet Timeout (minutes)</label>
+                <input type="number" class="form-input" id="aichat-timeout" min="1" value="30">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Personality</label>
+                <input type="text" class="form-input" id="aichat-personality" placeholder="e.g. friendly and engaging">
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="saveConfig('AIChatConfig')">Save Changes</button>
+          </div>
+        </div>
+
+        <!-- PROTECTION PANEL -->
+        <div class="panel" id="panel-protection">
+          <div class="panel-header">
+            <h2>Protection</h2>
+            <p>Configure anti-bot, anti-nuke, and anti-raid protection.</p>
+          </div>
+          <div class="card">
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Anti-Bot</div>
+                <div class="toggle-desc">Prevent unauthorized bot joins.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="prot-antibot">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Anti-Nuke</div>
+                <div class="toggle-desc">Detect and punish mass destructive actions.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="prot-antinuke">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Anti-Raid</div>
+                <div class="toggle-desc">Detect and punish raid join patterns.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="prot-antiraid">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Anti-Bot Threshold</label>
+                <input type="number" class="form-input" id="prot-antibot-thresh" min="1" value="3">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Anti-Nuke Threshold</label>
+                <input type="number" class="form-input" id="prot-antinuke-thresh" min="1" value="3">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Anti-Raid Threshold</label>
+                <input type="number" class="form-input" id="prot-antiraid-thresh" min="1" value="5">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Anti-Raid Time Window (ms)</label>
+                <input type="number" class="form-input" id="prot-antiraid-time" min="1000" value="10000">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Punishment</label>
+              <select class="form-select" id="prot-punishment">
+                <option value="ban">Ban</option>
+                <option value="kick">Kick</option>
+                <option value="timeout">Timeout</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Whitelisted Users</label>
+              <input type="text" class="form-input" id="prot-whitelist" placeholder="User IDs separated by commas">
+            </div>
+            <button class="btn btn-primary" onclick="saveConfig('ProtectionSettings')">Save Changes</button>
+          </div>
+        </div>
+
+        <!-- SERVER LOGS PANEL -->
+        <div class="panel" id="panel-serverlogs">
+          <div class="panel-header">
+            <h2>Server Logs</h2>
+            <p>Configure logging channels for server events.</p>
+          </div>
+          <div class="card">
+            <div class="form-group">
+              <label class="form-label">Log Channel ID</label>
+              <input type="text" class="form-input" id="logs-channel" placeholder="Main log channel ID">
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Messages</div>
+                <div class="toggle-desc">Log message edits and deletes.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="logs-messages">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Nicknames</div>
+                <div class="toggle-desc">Log nickname changes.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="logs-nicknames">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Member Events</div>
+                <div class="toggle-desc">Log joins and leaves.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="logs-members">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Channel Events</div>
+                <div class="toggle-desc">Log channel creations and deletions.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="logs-channels">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Role Events</div>
+                <div class="toggle-desc">Log role changes.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="logs-roles">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Voice Events</div>
+                <div class="toggle-desc">Log voice channel joins/leaves.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="logs-voice">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Thread Events</div>
+                <div class="toggle-desc">Log thread creations and deletions.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="logs-threads">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Boosts</div>
+                <div class="toggle-desc">Log server boost events.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="logs-boosts">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <button class="btn btn-primary" onclick="saveConfig('ServerLog')">Save Changes</button>
+          </div>
+        </div>
+
+        <!-- AUTO ROLES PANEL -->
+        <div class="panel" id="panel-autoroles">
+          <div class="panel-header">
+            <h2>Auto Roles</h2>
+            <p>Automatically assign roles to new members.</p>
+          </div>
+          <div class="card">
+            <div class="form-group">
+              <label class="form-label">Role IDs</label>
+              <input type="text" class="form-input" id="autoroles-roles" placeholder="Role IDs separated by commas">
+            </div>
+            <button class="btn btn-primary" onclick="saveAutoRoles()">Save Changes</button>
+          </div>
+        </div>
+
+        <!-- BUTTON ROLES PANEL -->
+        <div class="panel" id="panel-buttonroles">
+          <div class="panel-header">
+            <h2>Button Roles</h2>
+            <p>Create role selection panels with clickable buttons.</p>
+          </div>
+          <div class="card">
+            <div class="form-group">
+              <label class="form-label">Panel Name</label>
+              <input type="text" class="form-input" id="btnrole-panelname" placeholder="e.g. Choose your color">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Panel Description</label>
+              <textarea class="form-textarea" id="btnrole-description" placeholder="Description shown above the buttons"></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Target Channel ID</label>
+              <input type="text" class="form-input" id="btnrole-channel" placeholder="Channel to send the panel">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Buttons (JSON)</label>
+              <textarea class="form-textarea" id="btnrole-buttons" placeholder='[{"label":"Red","roleId":"123","style":"Primary"},{"label":"Blue","roleId":"456","style":"Secondary"}]'></textarea>
+              <small style="color: var(--text-muted); font-size: 0.75rem;">Format: [{"label":"Name","roleId":"ID","style":"Primary|Secondary|Success|Danger"}]</small>
+            </div>
+            <button class="btn btn-primary" onclick="saveButtonRole()">Create Panel</button>
+          </div>
+        </div>
+
+        <!-- SERVER STATUS PANEL -->
+        <div class="panel" id="panel-serverstatus">
+          <div class="panel-header">
+            <h2>Server Status</h2>
+            <p>Display Minecraft server status in a channel.</p>
+          </div>
+          <div class="card">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Server Name</label>
+                <input type="text" class="form-input" id="srvstatus-name" placeholder="My Server">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Server IP</label>
+                <input type="text" class="form-input" id="srvstatus-ip" placeholder="play.example.com">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Game Mode</label>
+                <select class="form-select" id="srvstatus-mode">
+                  <option value="java">Java Edition</option>
+                  <option value="bedrock">Bedrock Edition</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Status Channel ID</label>
+                <input type="text" class="form-input" id="srvstatus-channel" placeholder="Channel for status message">
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="saveServerStatus()">Save Changes</button>
           </div>
         </div>
 

@@ -109,6 +109,8 @@ app.get('/api/guild/:guildId/configs', requireAdmin, async (req, res) => {
     const models = [
       'SwearFilter', 'AntiSpam', 'LinkFilter', 'Starboard',
       'CrateConfig', 'TicketSettings', 'AFK',
+      'AIChatConfig', 'ProtectionSettings', 'serverlogs',
+      'AutoRoles', 'welcome', 'ButtonRole', 'ServerStatus',
     ];
 
     for (const modelName of models) {
@@ -121,10 +123,108 @@ app.get('/api/guild/:guildId/configs', requireAdmin, async (req, res) => {
       }
     }
 
+    try {
+      const { GuildSettings } = require(path.join(__dirname, '..', 'models', 'Level'));
+      configs.Level = await GuildSettings.findOne({ guildId: req.params.guildId });
+    } catch {
+      configs.Level = null;
+    }
+
     res.json(configs);
   } catch (err) {
     console.error('Error fetching configs:', err);
     res.status(500).json({ error: 'Failed to fetch configs' });
+  }
+});
+
+app.post('/api/guild/:guildId/config/:model', requireAdmin, async (req, res) => {
+  try {
+    let Model;
+    if (req.params.model === 'Level') {
+      const { GuildSettings } = require(path.join(__dirname, '..', 'models', 'Level'));
+      Model = GuildSettings;
+    } else if (req.params.model === 'ServerLog') {
+      Model = require(path.join(__dirname, '..', 'models', 'serverlogs'));
+    } else if (req.params.model === 'AutoRole') {
+      Model = require(path.join(__dirname, '..', 'models', 'AutoRoles'));
+    } else if (req.params.model === 'Welcome') {
+      Model = require(path.join(__dirname, '..', 'models', 'welcome'));
+    } else if (req.params.model === 'ButtonRole') {
+      Model = require(path.join(__dirname, '..', 'models', 'ButtonRole'));
+    } else if (req.params.model === 'ServerStatus') {
+      Model = require(path.join(__dirname, '..', 'models', 'ServerStatus'));
+    } else {
+      Model = require(path.join(__dirname, '..', 'models', req.params.model));
+    }
+
+    const data = await Model.findOneAndUpdate(
+      { guildId: req.params.guildId },
+      { $set: req.body },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    res.json(data);
+  } catch (err) {
+    console.error('Error saving config:', err);
+    res.status(500).json({ error: 'Failed to save config' });
+  }
+});
+
+// Leaderboard API
+app.get('/api/guild/:guildId/leaderboard', requireAdmin, async (req, res) => {
+  try {
+    const { MemberData } = require(path.join(__dirname, '..', 'models', 'Level'));
+    const type = req.query.type || 'level';
+
+    let sortField;
+    if (type === 'vc') {
+      sortField = 'voiceSeconds';
+    } else {
+      sortField = 'totalXp';
+    }
+
+    const top = await MemberData.find({ guildId: req.params.guildId })
+      .sort({ [sortField]: -1 })
+      .limit(25);
+
+    const userIds = top.map(m => m.userId);
+    let userMap = {};
+
+    if (userIds.length > 0) {
+      try {
+        const membersRes = await fetch(`https://discord.com/api/guilds/${req.params.guildId}/members/search?limit=100`, {
+          headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` },
+        });
+        if (membersRes.ok) {
+          const members = await membersRes.json();
+          members.forEach(m => {
+            userMap[m.user.id] = {
+              username: m.user.username,
+              avatar: m.user.avatar,
+              discriminator: m.user.discriminator,
+            };
+          });
+        }
+      } catch (e) {
+        console.error('Failed to fetch members:', e);
+      }
+    }
+
+    const leaderboard = top.map((m, i) => ({
+      rank: i + 1,
+      userId: m.userId,
+      username: userMap[m.userId]?.username || `User ${m.userId}`,
+      avatar: userMap[m.userId]?.avatar || null,
+      level: m.level,
+      xp: m.xp,
+      totalXp: m.totalXp,
+      voiceXp: m.voiceXp,
+      voiceSeconds: m.voiceSeconds,
+    }));
+
+    res.json(leaderboard);
+  } catch (err) {
+    console.error('Error fetching leaderboard:', err);
+    res.status(500).json({ error: 'Failed to fetch leaderboard' });
   }
 });
 

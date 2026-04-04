@@ -1,7 +1,8 @@
 const { Schema, model } = require('mongoose');
 
 const autoRoleSchema = new Schema({
-  serverId: { type: String, required: true, unique: true },
+  guildId: { type: String, required: true, unique: true },
+  serverId: { type: String },
   roleIds: [{ type: String, required: true }],
 });
 
