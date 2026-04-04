@@ -3,6 +3,7 @@ const session = require('express-session');
 const path = require('path');
 const crypto = require('crypto');
 const app = express();
+app.set('trust proxy', 1);
 
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
