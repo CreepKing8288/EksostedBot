@@ -117,11 +117,6 @@ module.exports = {
     setTimeout(async () => {
       try {
         const current = await message.fetch();
-        const crateState = interaction.client.activeCrateMessages.get(message.id);
-        if (crateState && crateState.claimedBy.size > 0) {
-          const claimers = [...crateState.claimedBy].map(id => `<@${id}>`).join(', ');
-          await current.channel.send(`⏰ This crate has expired! Claimed by: ${claimers}`);
-        }
         await current.delete();
       } catch (error) {
         if (error.code !== 10008) {
