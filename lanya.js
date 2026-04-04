@@ -53,29 +53,48 @@ app.get('/auth/callback', async (req, res) => {
       }),
     });
 
+    if (!tokenRes.ok) {
+      const errText = await tokenRes.text();
+      console.error('Token exchange failed:', tokenRes.status, errText);
+      return res.status(500).send(`Token exchange failed: ${errText}`);
+    }
     const tokens = await tokenRes.json();
+
     const userRes = await fetch('https://discord.com/api/users/@me', {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
+    if (!userRes.ok) {
+      console.error('Failed to fetch user:', userRes.status);
+      return res.status(500).send('Failed to fetch user');
+    }
     const user = await userRes.json();
 
     const guildsRes = await fetch('https://discord.com/api/users/@me/guilds', {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
+    if (!guildsRes.ok) {
+      console.error('Failed to fetch guilds:', guildsRes.status);
+      return res.status(500).send('Failed to fetch guilds');
+    }
     const guilds = await guildsRes.json();
+
+    if (!Array.isArray(guilds)) {
+      console.error('Guilds is not an array:', guilds);
+      return res.status(500).send('Invalid guilds response');
+    }
 
     req.session.user = {
       id: user.id,
       username: user.username,
       discriminator: user.discriminator,
       avatar: user.avatar,
-      guilds: guilds.filter(g => (g.permissions & 0x8) === 0x8),
+      guilds: guilds.filter(g => (BigInt(g.permissions) & 0x8n) === 0x8n),
     };
 
     res.redirect('/dashboard');
   } catch (err) {
-    console.error('OAuth error:', err);
-    res.redirect('/');
+    console.error('OAuth error:', err.message, err.stack);
+    res.status(500).send(`OAuth error: ${err.message}`);
   }
 });
 
