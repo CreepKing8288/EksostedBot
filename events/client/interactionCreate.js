@@ -159,8 +159,13 @@ module.exports = {
 
           await memberData.save();
 
+          const sizeLabel = size.charAt(0).toUpperCase() + size.slice(1);
+          await interaction.channel.send({
+            content: `${interaction.user} claimed a **${sizeLabel} Crate** and earned **${points} XP**!`,
+          });
+
           return interaction.editReply({
-            content: messageText,
+            content: `You claimed a **${sizeLabel} Crate** and earned **${points} XP**!`,
           });
         }
       } catch (error) {

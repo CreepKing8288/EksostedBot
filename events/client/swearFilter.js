@@ -12,7 +12,10 @@ const defaultSwearWords = [
 ];
 
 async function checkWithAI(content) {
-  if (!groq) return false;
+  if (!groq) {
+    console.log('[SwearFilter] GROQ_API_KEY not set, AI check skipped');
+    return false;
+  }
 
   try {
     const completion = await groq.chat.completions.create({
@@ -20,30 +23,35 @@ async function checkWithAI(content) {
       messages: [
         {
           role: 'system',
-          content: 'You are a content moderation assistant. Your only task is to determine if a message contains swearing, profanity, offensive language, or inappropriate content. Respond with ONLY "yes" or "no".',
+          content: 'You are a profanity detection system. Analyze the given message and determine if it contains any swear words, profanity, cursing, or vulgar language. Reply with ONLY the word "YES" if it contains profanity, or "NO" if it does not. Do not add any explanation.',
         },
         {
           role: 'user',
-          content: `Does this message contain swearing, profanity, or offensive language? Message: "${content}"`,
+          content: `Message to analyze: "${content}"`,
         },
       ],
-      max_tokens: 5,
+      max_tokens: 10,
       temperature: 0,
     });
 
-    const response = completion.choices[0].message.content.trim().toLowerCase();
-    return response === 'yes';
-  } catch {
+    const response = completion.choices[0].message.content.trim().toLowerCase().replace(/[^a-z]/g, '');
+    console.log(`[SwearFilter] AI response for "${content}": "${response}"`);
+    return response.includes('yes');
+  } catch (err) {
+    console.error('[SwearFilter] AI check error:', err.message);
     return false;
   }
 }
 
 function checkWithWordList(content, allWords) {
   const lowerContent = content.toLowerCase();
-  return allWords.some(word => {
-    const regex = new RegExp(`\\b${escapeRegex(word)}\\b`, 'i');
-    return regex.test(lowerContent);
-  });
+  for (const word of allWords) {
+    if (lowerContent.includes(word.toLowerCase())) {
+      console.log(`[SwearFilter] Word-list match: "${word}" in "${content}"`);
+      return true;
+    }
+  }
+  return false;
 }
 
 module.exports = {
@@ -53,9 +61,16 @@ module.exports = {
     if (message.author.bot || !message.guild) return;
 
     const config = await SwearFilter.findOne({ guildId: message.guild.id });
-    if (!config || !config.enabled) return;
+    if (!config) {
+      return;
+    }
+    if (!config.enabled) {
+      return;
+    }
 
     if (message.member.permissions.has('ManageMessages')) return;
+
+    console.log(`[SwearFilter] Checking message from ${message.author.tag}: "${message.content}" (mode: ${config.aiMode ? 'AI' : 'word-list'})`);
 
     let isOffensive = false;
 
@@ -67,6 +82,7 @@ module.exports = {
     }
 
     if (isOffensive) {
+      console.log(`[SwearFilter] Deleting offensive message from ${message.author.tag}`);
       await message.delete().catch(() => {});
       const warning = await message.channel.send({
         content: `${message.author}, swearing is not allowed in this server.`,
