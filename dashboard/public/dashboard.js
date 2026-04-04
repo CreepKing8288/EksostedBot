@@ -109,8 +109,12 @@ async function loadConfigs() {
 
   try {
     const res = await fetch(`/api/guild/${currentGuildId}/configs`);
-    if (!res.ok) return;
+    if (!res.ok) {
+      console.error('Config fetch failed:', res.status, await res.text());
+      return;
+    }
     const configs = await res.json();
+    console.log('Loaded configs:', Object.keys(configs));
 
     populateSwearFilter(configs.SwearFilter);
     populateAntiSpam(configs.AntiSpam);
@@ -122,7 +126,7 @@ async function loadConfigs() {
     populateWelcome(configs.welcome);
     populateAIChat(configs.AIChatConfig);
     populateProtection(configs.ProtectionSettings);
-    populateServerLogs(configs.ServerLog);
+    populateServerLogs(configs.serverlogs);
     populateAutoRoles(configs.AutoRole);
     populateButtonRole(configs.ButtonRole);
     updateOverview(configs);
@@ -265,7 +269,7 @@ function updateOverview(configs) {
   set('stat-aichat', configs.AIChatConfig?.enabled, 'Enabled', 'Disabled');
   const prot = configs.ProtectionSettings;
   set('stat-protection', prot?.antiBot || prot?.antiNuke || prot?.antiRaid, 'Enabled', 'Disabled');
-  set('stat-logs', configs.ServerLog?.logChannel, 'Configured', 'Disabled');
+  set('stat-logs', configs.serverlogs?.logChannel, 'Configured', 'Disabled');
   set('stat-autoroles', configs.AutoRole?.roleIds?.length > 0, 'Active', 'Disabled');
 }
 
@@ -404,12 +408,16 @@ async function saveConfig(modelName) {
       body: JSON.stringify(payload),
     });
 
-    if (!res.ok) throw new Error('Failed to save');
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText);
+    }
 
     showToast('Settings saved successfully!', 'success');
     await loadConfigs();
   } catch (err) {
-    showToast('Failed to save settings', 'error');
+    console.error('Save error:', err);
+    showToast(`Failed to save: ${err.message}`, 'error');
   }
 }
 
@@ -475,11 +483,15 @@ async function saveWelcome() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error('Failed to save');
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText);
+    }
     showToast('Settings saved successfully!', 'success');
     await loadConfigs();
-  } catch {
-    showToast('Failed to save settings', 'error');
+  } catch (err) {
+    console.error('Save error:', err);
+    showToast(`Failed to save: ${err.message}`, 'error');
   }
 }
 
@@ -497,16 +509,23 @@ async function saveAutoRoles() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error('Failed to save');
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText);
+    }
     showToast('Settings saved successfully!', 'success');
     await loadConfigs();
-  } catch {
-    showToast('Failed to save settings', 'error');
+  } catch (err) {
+    console.error('Save error:', err);
+    showToast(`Failed to save: ${err.message}`, 'error');
   }
 }
 
 async function saveButtonRole() {
   if (!currentGuildId) return showToast('No server selected', 'error');
+  const panelName = document.getElementById('btnrole-panelname').value.trim();
+  const channelId = document.getElementById('btnrole-channel').value.trim();
+  if (!panelName || !channelId) return showToast('Panel name and channel ID are required', 'error');
   let buttons;
   try {
     buttons = JSON.parse(document.getElementById('btnrole-buttons').value || '[]');
@@ -515,9 +534,9 @@ async function saveButtonRole() {
   }
   const payload = {
     guildId: currentGuildId,
-    panelName: document.getElementById('btnrole-panelname').value,
+    panelName,
     panelData: { description: document.getElementById('btnrole-description').value },
-    channelId: document.getElementById('btnrole-channel').value,
+    channelId,
     buttons,
   };
   try {
@@ -526,11 +545,15 @@ async function saveButtonRole() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error('Failed to save');
-    showToast('Button role panel saved! Use the command to send it.', 'success');
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText);
+    }
+    showToast('Button role panel saved!', 'success');
     await loadConfigs();
-  } catch {
-    showToast('Failed to save settings', 'error');
+  } catch (err) {
+    console.error('Save error:', err);
+    showToast(`Failed to save: ${err.message}`, 'error');
   }
 }
 

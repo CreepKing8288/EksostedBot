@@ -124,19 +124,44 @@ app.get('/api/guilds', requireAuth, (req, res) => {
 app.get('/api/guild/:guildId/configs', requireAuth, async (req, res) => {
   try {
     const configs = {};
-    const models = [
+    const guildId = req.params.guildId;
+
+    const modelsWithGuildId = [
       'SwearFilter', 'AntiSpam', 'LinkFilter', 'Starboard',
-      'CrateConfig', 'TicketSettings',
+      'CrateConfig', 'TicketSettings', 'AFK',
+      'AIChatConfig', 'ProtectionSettings', 'serverlogs',
+      'ButtonRole', 'ServerStatus',
     ];
 
-    for (const modelName of models) {
+    for (const modelName of modelsWithGuildId) {
       try {
         const Model = require(`./models/${modelName}`);
-        const data = await Model.findOne({ guildId: req.params.guildId });
+        const data = await Model.findOne({ guildId });
         configs[modelName] = data;
       } catch {
         configs[modelName] = null;
       }
+    }
+
+    try {
+      const AutoRole = require('./models/AutoRoles');
+      configs.AutoRole = await AutoRole.findOne({ $or: [{ guildId }, { serverId: guildId }] });
+    } catch {
+      configs.AutoRole = null;
+    }
+
+    try {
+      const Welcome = require('./models/welcome');
+      configs.welcome = await Welcome.findOne({ $or: [{ guildId }, { serverId: guildId }] });
+    } catch {
+      configs.welcome = null;
+    }
+
+    try {
+      const { GuildSettings } = require('./models/Level');
+      configs.Level = await GuildSettings.findOne({ guildId });
+    } catch {
+      configs.Level = null;
     }
 
     res.json(configs);
@@ -148,9 +173,34 @@ app.get('/api/guild/:guildId/configs', requireAuth, async (req, res) => {
 
 app.post('/api/guild/:guildId/config/:model', requireAuth, async (req, res) => {
   try {
-    const Model = require(`./models/${req.params.model}`);
+    let Model;
+    let query;
+
+    if (req.params.model === 'Level') {
+      Model = require('./models/Level').GuildSettings;
+      query = { guildId: req.params.guildId };
+    } else if (req.params.model === 'ServerLog') {
+      Model = require('./models/serverlogs');
+      query = { guildId: req.params.guildId };
+    } else if (req.params.model === 'AutoRole') {
+      Model = require('./models/AutoRoles');
+      query = { $or: [{ guildId: req.params.guildId }, { serverId: req.params.guildId }] };
+    } else if (req.params.model === 'Welcome') {
+      Model = require('./models/welcome');
+      query = { $or: [{ guildId: req.params.guildId }, { serverId: req.params.guildId }] };
+    } else if (req.params.model === 'ButtonRole') {
+      Model = require('./models/ButtonRole');
+      query = { guildId: req.params.guildId };
+    } else if (req.params.model === 'ServerStatus') {
+      Model = require('./models/ServerStatus');
+      query = { guildId: req.params.guildId };
+    } else {
+      Model = require(`./models/${req.params.model}`);
+      query = { guildId: req.params.guildId };
+    }
+
     const data = await Model.findOneAndUpdate(
-      { guildId: req.params.guildId },
+      query,
       { $set: req.body },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
@@ -158,6 +208,35 @@ app.post('/api/guild/:guildId/config/:model', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Error saving config:', err);
     res.status(500).json({ error: 'Failed to save config' });
+  }
+});
+
+app.get('/api/guild/:guildId/leaderboard', requireAuth, async (req, res) => {
+  try {
+    const { MemberData } = require('./models/Level');
+    const type = req.query.type || 'level';
+    const sortField = type === 'vc' ? 'voiceSeconds' : 'totalXp';
+
+    const top = await MemberData.find({ guildId: req.params.guildId })
+      .sort({ [sortField]: -1 })
+      .limit(25);
+
+    const leaderboard = top.map((m, i) => ({
+      rank: i + 1,
+      userId: m.userId,
+      username: `User ${m.userId}`,
+      avatar: null,
+      level: m.level,
+      xp: m.xp,
+      totalXp: m.totalXp,
+      voiceXp: m.voiceXp,
+      voiceSeconds: m.voiceSeconds,
+    }));
+
+    res.json(leaderboard);
+  } catch (err) {
+    console.error('Error fetching leaderboard:', err);
+    res.status(500).json({ error: 'Failed to fetch leaderboard' });
   }
 });
 
