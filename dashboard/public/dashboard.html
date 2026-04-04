@@ -72,12 +72,6 @@
           <a href="#" class="nav-item" data-panel="leveling">
             <span class="nav-icon">📈</span> Level Settings
           </a>
-          <a href="#" class="nav-item" data-panel="lvl-leaderboard">
-            <span class="nav-icon">🏆</span> Level Leaderboard
-          </a>
-          <a href="#" class="nav-item" data-panel="vc-leaderboard">
-            <span class="nav-icon">🎤</span> VC Leaderboard
-          </a>
         </div>
 
         <div class="nav-section">
@@ -99,9 +93,6 @@
           </a>
           <a href="#" class="nav-item" data-panel="buttonroles">
             <span class="nav-icon">🔘</span> Button Roles
-          </a>
-          <a href="#" class="nav-item" data-panel="serverstatus">
-            <span class="nav-icon">🎮</span> Server Status
           </a>
         </div>
       </nav>
@@ -223,6 +214,20 @@
           <div class="welcome-card">
             <h2>Welcome to the Dashboard</h2>
             <p>Select a server from the sidebar to manage your bot settings. All changes are saved instantly.</p>
+          </div>
+
+          <div class="leaderboard-section">
+            <h2>Level Leaderboard</h2>
+            <div class="leaderboard-container" id="lvl-leaderboard-list">
+              <p class="lb-loading">Loading...</p>
+            </div>
+          </div>
+
+          <div class="leaderboard-section">
+            <h2>VC Leaderboard</h2>
+            <div class="leaderboard-container" id="vc-leaderboard-list">
+              <p class="lb-loading">Loading...</p>
+            </div>
           </div>
         </div>
 
@@ -569,30 +574,16 @@
         </div>
 
         <!-- LEVEL LEADERBOARD PANEL -->
-        <div class="panel" id="panel-lvl-leaderboard">
+        <div class="panel" id="panel-lvl-leaderboard" style="display:none;">
           <div class="panel-header">
             <h2>Level Leaderboard</h2>
-            <p>Top members by total XP in this server.</p>
-          </div>
-          <div class="card">
-            <div class="leaderboard-container" id="lvl-leaderboard-list">
-              <p class="lb-loading">Click "Refresh" to load leaderboard</p>
-            </div>
-            <button class="btn btn-primary" onclick="loadLeaderboard('level')">Refresh</button>
           </div>
         </div>
 
         <!-- VC LEADERBOARD PANEL -->
-        <div class="panel" id="panel-vc-leaderboard">
+        <div class="panel" id="panel-vc-leaderboard" style="display:none;">
           <div class="panel-header">
             <h2>VC Leaderboard</h2>
-            <p>Top members by voice channel time.</p>
-          </div>
-          <div class="card">
-            <div class="leaderboard-container" id="vc-leaderboard-list">
-              <p class="lb-loading">Click "Refresh" to load leaderboard</p>
-            </div>
-            <button class="btn btn-primary" onclick="loadLeaderboard('vc')">Refresh</button>
           </div>
         </div>
 
@@ -868,40 +859,6 @@
               <small style="color: var(--text-muted); font-size: 0.75rem;">Format: [{"label":"Name","roleId":"ID","style":"Primary|Secondary|Success|Danger"}]</small>
             </div>
             <button class="btn btn-primary" onclick="saveButtonRole()">Create Panel</button>
-          </div>
-        </div>
-
-        <!-- SERVER STATUS PANEL -->
-        <div class="panel" id="panel-serverstatus">
-          <div class="panel-header">
-            <h2>Server Status</h2>
-            <p>Display Minecraft server status in a channel.</p>
-          </div>
-          <div class="card">
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label">Server Name</label>
-                <input type="text" class="form-input" id="srvstatus-name" placeholder="My Server">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Server IP</label>
-                <input type="text" class="form-input" id="srvstatus-ip" placeholder="play.example.com">
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label">Game Mode</label>
-                <select class="form-select" id="srvstatus-mode">
-                  <option value="java">Java Edition</option>
-                  <option value="bedrock">Bedrock Edition</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Status Channel ID</label>
-                <input type="text" class="form-input" id="srvstatus-channel" placeholder="Channel for status message">
-              </div>
-            </div>
-            <button class="btn btn-primary" onclick="saveServerStatus()">Save Changes</button>
           </div>
         </div>
 

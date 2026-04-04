@@ -106,17 +106,19 @@ app.get('/api/guilds', requireAuth, (req, res) => {
 app.get('/api/guild/:guildId/configs', requireAdmin, async (req, res) => {
   try {
     const configs = {};
-    const models = [
+    const guildId = req.params.guildId;
+
+    const modelsWithGuildId = [
       'SwearFilter', 'AntiSpam', 'LinkFilter', 'Starboard',
       'CrateConfig', 'TicketSettings', 'AFK',
       'AIChatConfig', 'ProtectionSettings', 'serverlogs',
-      'AutoRoles', 'welcome', 'ButtonRole', 'ServerStatus',
+      'ButtonRole', 'ServerStatus',
     ];
 
-    for (const modelName of models) {
+    for (const modelName of modelsWithGuildId) {
       try {
         const Model = require(path.join(__dirname, '..', 'models', modelName));
-        const data = await Model.findOne({ guildId: req.params.guildId });
+        const data = await Model.findOne({ guildId });
         configs[modelName] = data;
       } catch {
         configs[modelName] = null;
@@ -124,8 +126,22 @@ app.get('/api/guild/:guildId/configs', requireAdmin, async (req, res) => {
     }
 
     try {
+      const AutoRole = require(path.join(__dirname, '..', 'models', 'AutoRoles'));
+      configs.AutoRole = await AutoRole.findOne({ $or: [{ guildId }, { serverId: guildId }] });
+    } catch {
+      configs.AutoRole = null;
+    }
+
+    try {
+      const Welcome = require(path.join(__dirname, '..', 'models', 'welcome'));
+      configs.welcome = await Welcome.findOne({ $or: [{ guildId }, { serverId: guildId }] });
+    } catch {
+      configs.welcome = null;
+    }
+
+    try {
       const { GuildSettings } = require(path.join(__dirname, '..', 'models', 'Level'));
-      configs.Level = await GuildSettings.findOne({ guildId: req.params.guildId });
+      configs.Level = await GuildSettings.findOne({ guildId });
     } catch {
       configs.Level = null;
     }
@@ -140,25 +156,33 @@ app.get('/api/guild/:guildId/configs', requireAdmin, async (req, res) => {
 app.post('/api/guild/:guildId/config/:model', requireAdmin, async (req, res) => {
   try {
     let Model;
+    let query;
+
     if (req.params.model === 'Level') {
-      const { GuildSettings } = require(path.join(__dirname, '..', 'models', 'Level'));
-      Model = GuildSettings;
+      Model = require(path.join(__dirname, '..', 'models', 'Level')).GuildSettings;
+      query = { guildId: req.params.guildId };
     } else if (req.params.model === 'ServerLog') {
       Model = require(path.join(__dirname, '..', 'models', 'serverlogs'));
+      query = { guildId: req.params.guildId };
     } else if (req.params.model === 'AutoRole') {
       Model = require(path.join(__dirname, '..', 'models', 'AutoRoles'));
+      query = { $or: [{ guildId: req.params.guildId }, { serverId: req.params.guildId }] };
     } else if (req.params.model === 'Welcome') {
       Model = require(path.join(__dirname, '..', 'models', 'welcome'));
+      query = { $or: [{ guildId: req.params.guildId }, { serverId: req.params.guildId }] };
     } else if (req.params.model === 'ButtonRole') {
       Model = require(path.join(__dirname, '..', 'models', 'ButtonRole'));
+      query = { guildId: req.params.guildId };
     } else if (req.params.model === 'ServerStatus') {
       Model = require(path.join(__dirname, '..', 'models', 'ServerStatus'));
+      query = { guildId: req.params.guildId };
     } else {
       Model = require(path.join(__dirname, '..', 'models', req.params.model));
+      query = { guildId: req.params.guildId };
     }
 
     const data = await Model.findOneAndUpdate(
-      { guildId: req.params.guildId },
+      query,
       { $set: req.body },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
@@ -225,21 +249,6 @@ app.get('/api/guild/:guildId/leaderboard', requireAdmin, async (req, res) => {
   } catch (err) {
     console.error('Error fetching leaderboard:', err);
     res.status(500).json({ error: 'Failed to fetch leaderboard' });
-  }
-});
-
-app.post('/api/guild/:guildId/config/:model', requireAdmin, async (req, res) => {
-  try {
-    const Model = require(path.join(__dirname, '..', 'models', req.params.model));
-    const data = await Model.findOneAndUpdate(
-      { guildId: req.params.guildId },
-      { $set: req.body },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
-    res.json(data);
-  } catch (err) {
-    console.error('Error saving config:', err);
-    res.status(500).json({ error: 'Failed to save config' });
   }
 });
 

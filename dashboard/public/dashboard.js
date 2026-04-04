@@ -99,6 +99,8 @@ async function selectServer(guildId, guildName) {
   });
 
   await loadConfigs();
+  await loadLeaderboard('level');
+  await loadLeaderboard('vc');
   switchPanel('overview');
 }
 
@@ -123,7 +125,6 @@ async function loadConfigs() {
     populateServerLogs(configs.ServerLog);
     populateAutoRoles(configs.AutoRole);
     populateButtonRole(configs.ButtonRole);
-    populateServerStatus(configs.ServerStatus);
     updateOverview(configs);
   } catch (err) {
     console.error('Failed to load configs:', err);
@@ -244,21 +245,6 @@ function populateButtonRole(data) {
     document.getElementById('btnrole-description').value = '';
     document.getElementById('btnrole-channel').value = '';
     document.getElementById('btnrole-buttons').value = '';
-  }
-}
-
-function populateServerStatus(data) {
-  if (data && data.length > 0) {
-    const s = data[0];
-    document.getElementById('srvstatus-name').value = s.serverName || '';
-    document.getElementById('srvstatus-ip').value = s.serverIp || '';
-    document.getElementById('srvstatus-mode').value = s.gameMode || 'java';
-    document.getElementById('srvstatus-channel').value = s.channelId || '';
-  } else {
-    document.getElementById('srvstatus-name').value = '';
-    document.getElementById('srvstatus-ip').value = '';
-    document.getElementById('srvstatus-mode').value = 'java';
-    document.getElementById('srvstatus-channel').value = '';
   }
 }
 
@@ -454,7 +440,6 @@ function switchPanel(panelName) {
     serverlogs: 'Server Logs',
     autoroles: 'Auto Roles',
     buttonroles: 'Button Roles',
-    serverstatus: 'Server Status',
   };
 
   document.getElementById('topbarTitle').textContent = titles[panelName] || 'Dashboard';
@@ -479,6 +464,7 @@ async function saveWelcome() {
   if (!currentGuildId) return showToast('No server selected', 'error');
   const payload = {
     guildId: currentGuildId,
+    serverId: currentGuildId,
     enabled: document.getElementById('welcome-enabled').checked,
     channelId: document.getElementById('welcome-channel').value,
     description: document.getElementById('welcome-message').value,
@@ -501,6 +487,7 @@ async function saveAutoRoles() {
   if (!currentGuildId) return showToast('No server selected', 'error');
   const payload = {
     guildId: currentGuildId,
+    serverId: currentGuildId,
     roleIds: document.getElementById('autoroles-roles').value
       .split(',').map(r => r.trim()).filter(r => r),
   };
@@ -547,31 +534,8 @@ async function saveButtonRole() {
   }
 }
 
-async function saveServerStatus() {
-  if (!currentGuildId) return showToast('No server selected', 'error');
-  const payload = {
-    guildId: currentGuildId,
-    serverName: document.getElementById('srvstatus-name').value,
-    serverIp: document.getElementById('srvstatus-ip').value,
-    gameMode: document.getElementById('srvstatus-mode').value,
-    channelId: document.getElementById('srvstatus-channel').value,
-  };
-  try {
-    const res = await fetch(`/api/guild/${currentGuildId}/config/ServerStatus`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error('Failed to save');
-    showToast('Settings saved successfully!', 'success');
-    await loadConfigs();
-  } catch {
-    showToast('Failed to save settings', 'error');
-  }
-}
-
 async function loadLeaderboard(type) {
-  if (!currentGuildId) return showToast('No server selected', 'error');
+  if (!currentGuildId) return;
   const container = document.getElementById(type === 'vc' ? 'vc-leaderboard-list' : 'lvl-leaderboard-list');
   container.innerHTML = '<p class="lb-loading">Loading...</p>';
 
@@ -626,7 +590,8 @@ async function loadLeaderboard(type) {
 
     html += '</tbody></table>';
     container.innerHTML = html;
-  } catch {
+  } catch (err) {
+    console.error('Leaderboard error:', err);
     container.innerHTML = '<p class="lb-empty">Failed to load leaderboard.</p>';
   }
 }
