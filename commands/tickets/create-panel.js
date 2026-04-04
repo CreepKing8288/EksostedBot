@@ -149,7 +149,7 @@ module.exports = {
           .addOptions(
             categories.map((cat) => ({
               label: cat.name,
-              description: cat.description,
+              description: cat.description ? cat.description.slice(0, 100) : 'No description',
               value: cat.name,
               emoji: cat.emoji,
             }))
