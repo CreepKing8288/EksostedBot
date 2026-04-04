@@ -101,16 +101,14 @@ module.exports = {
           }
 
           if (crateState.claimedBy.has(interaction.user.id)) {
-            return interaction.reply({
+            return interaction.editReply({
               content: 'You have already claimed this crate.',
-              ephemeral: true,
             });
           }
 
           if (crateState.claimedBy.size >= crateState.maxClaims) {
-            return interaction.reply({
+            return interaction.editReply({
               content: 'This crate has already been fully claimed.',
-              ephemeral: true,
             });
           }
 
