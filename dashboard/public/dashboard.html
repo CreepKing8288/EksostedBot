@@ -47,46 +47,12 @@
         </div>
 
         <div class="nav-section">
-          <div class="nav-section-title">Moderation</div>
-          <a href="#" class="nav-item" data-panel="swearfilter">
-            <span class="nav-icon">🔒</span> Swear Filter
-          </a>
-          <a href="#" class="nav-item" data-panel="antispam">
-            <span class="nav-icon">🛡️</span> Anti-Spam
-          </a>
-          <a href="#" class="nav-item" data-panel="linkfilter">
-            <span class="nav-icon">🔗</span> Link Filter
-          </a>
-        </div>
-
-        <div class="nav-section">
-          <div class="nav-section-title">Community</div>
-          <a href="#" class="nav-item" data-panel="starboard">
-            <span class="nav-icon">⭐</span> Starboard
-          </a>
-          <a href="#" class="nav-item" data-panel="crates">
-            <span class="nav-icon">🎁</span> Crate Drops
-          </a>
-        </div>
-
-        <div class="nav-section">
-          <div class="nav-section-title">Tickets</div>
-          <a href="#" class="nav-item" data-panel="tickets">
-            <span class="nav-icon">🎫</span> Ticket Settings
-          </a>
-        </div>
-
-        <div class="nav-section">
-          <div class="nav-section-title">Leveling</div>
-          <a href="#" class="nav-item" data-panel="leveling">
-            <span class="nav-icon">📈</span> Level Settings
-          </a>
-        </div>
-
-        <div class="nav-section">
           <div class="nav-section-title">Utility</div>
           <a href="#" class="nav-item" data-panel="prefix">
             <span class="nav-icon">⌨️</span> Prefix
+          </a>
+          <a href="#" class="nav-item" data-panel="welcome">
+            <span class="nav-icon">👋</span> Welcome
           </a>
           <a href="#" class="nav-item" data-panel="goodbye">
             <span class="nav-icon">👋</span> Goodbye
@@ -104,6 +70,31 @@
           <a href="#" class="nav-item" data-panel="giveaways">
             <span class="nav-icon">🎁</span> Giveaways
           </a>
+          <a href="#" class="nav-item" data-panel="crates">
+            <span class="nav-icon">🎁</span> Crate Drops
+          </a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Community</div>
+          <a href="#" class="nav-item" data-panel="starboard">
+            <span class="nav-icon">⭐</span> Starboard
+          </a>
+          
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Tickets</div>
+          <a href="#" class="nav-item" data-panel="tickets">
+            <span class="nav-icon">🎫</span> Ticket Settings
+          </a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Leveling</div>
+          <a href="#" class="nav-item" data-panel="leveling">
+            <span class="nav-icon">📈</span> Level Settings
+          </a>
         </div>
 
         <div class="nav-section">
@@ -117,20 +108,21 @@
         </div>
 
         <div class="nav-section">
-          <div class="nav-section-title">Bot Modification</div>
-          <a href="#" class="nav-item" data-panel="botstatus">
-            <span class="nav-icon">🟢</span> Bot Status
+          <div class="nav-section-title">Moderation</div>
+          <a href="#" class="nav-item" data-panel="swearfilter">
+            <span class="nav-icon">🔒</span> Swear Filter
           </a>
-          <a href="#" class="nav-item" data-panel="announcement">
-            <span class="nav-icon">📢</span> Global Announcement
+          <a href="#" class="nav-item" data-panel="antispam">
+            <span class="nav-icon">🛡️</span> Anti-Spam
+          </a>
+          <a href="#" class="nav-item" data-panel="linkfilter">
+            <span class="nav-icon">🔗</span> Link Filter
           </a>
         </div>
 
         <div class="nav-section">
           <div class="nav-section-title">Settings</div>
-          <a href="#" class="nav-item" data-panel="welcome">
-            <span class="nav-icon">👋</span> Welcome
-          </a>
+          
           <a href="#" class="nav-item" data-panel="aichat">
             <span class="nav-icon">🤖</span> AI Chat
           </a>
@@ -145,6 +137,16 @@
           </a>
           <a href="#" class="nav-item" data-panel="buttonroles">
             <span class="nav-icon">🔘</span> Button Roles
+          </a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Bot Modification</div>
+          <a href="#" class="nav-item" data-panel="botstatus">
+            <span class="nav-icon">🟢</span> Bot Status
+          </a>
+          <a href="#" class="nav-item" data-panel="announcement">
+            <span class="nav-icon">📢</span> Global Announcement
           </a>
         </div>
       </nav>
@@ -995,9 +997,10 @@
         <div class="panel" id="panel-welcome">
           <div class="panel-header">
             <h2>Welcome Messages</h2>
-            <p>Configure welcome messages for new members.</p>
+            <p>Configure rich welcome messages with embeds, images, DMs, and more.</p>
           </div>
-          <div class="card">
+
+          <div class="card" style="max-width: 900px;">
             <div class="toggle-row">
               <div>
                 <div class="toggle-label">Enable Welcome Messages</div>
@@ -1008,15 +1011,111 @@
                 <span class="toggle-slider"></span>
               </label>
             </div>
+
             <div class="form-group">
               <label class="form-label">Welcome Channel ID</label>
               <input type="text" class="form-input" id="welcome-channel" placeholder="Channel ID for welcome messages">
             </div>
+
             <div class="form-group">
-              <label class="form-label">Welcome Message</label>
-              <textarea class="form-textarea" id="welcome-message" placeholder="Use {member} and {server} as placeholders"></textarea>
+              <label class="form-label">Plain Message</label>
+              <textarea class="form-textarea" id="welcome-message" placeholder="Welcome {member} to {server}"></textarea>
+              <small style="color: var(--text-muted); font-size: 0.7rem;">Variables: <code style="color: var(--accent-light);">{member}</code> <code style="color: var(--accent-light);">{server}</code> <code style="color: var(--accent-light);">{memberCount}</code> <code style="color: var(--accent-light);">{mention}</code></small>
             </div>
-            <button class="btn btn-primary" onclick="saveWelcome()">Save Changes</button>
+
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Mention User</div>
+                <div class="toggle-desc">Ping the new member in the welcome message.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="welcome-mention">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="toggle-row" style="margin-top: 1rem;">
+              <div>
+                <div class="toggle-label">Enable Embed</div>
+                <div class="toggle-desc">Use a rich embed for the welcome message.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="welcome-embed-enabled">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div id="welcome-embed-fields" style="display: none; margin-top: 1rem;">
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Embed Title</label>
+                  <input type="text" class="form-input" id="welcome-embed-title" placeholder="Welcome to {server}!">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Embed Color</label>
+                  <input type="color" class="form-input" id="welcome-embed-color" value="#7c3aed" style="height: 40px; padding: 4px;">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Embed Description</label>
+                <textarea class="form-textarea" id="welcome-embed-desc" placeholder="We're glad to have you here!"></textarea>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Author Text</label>
+                <input type="text" class="form-input" id="welcome-embed-author" placeholder="e.g. Server Name">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Footer Text</label>
+                <input type="text" class="form-input" id="welcome-embed-footer" placeholder="Footer text">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Main Image URL</label>
+                <input type="text" class="form-input" id="welcome-embed-image" placeholder="https://... (banner image)">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Thumbnail URL</label>
+                <input type="text" class="form-input" id="welcome-embed-thumbnail" placeholder="https://... (small corner image)">
+              </div>
+
+              <div class="toggle-row" style="margin-top: 1rem;">
+                <div>
+                  <div class="toggle-label">Random Welcome Images</div>
+                  <div class="toggle-desc">Rotate through a list of images for each welcome.</div>
+                </div>
+                <label class="toggle">
+                  <input type="checkbox" id="welcome-random-images">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+
+              <div id="welcome-random-images-field" style="display: none; margin-top: 0.75rem;">
+                <label class="form-label">Image URLs (one per line)</label>
+                <textarea class="form-textarea" id="welcome-random-images-list" placeholder="https://example.com/image1.png&#10;https://example.com/image2.png&#10;https://example.com/image3.png" style="min-height: 120px;"></textarea>
+              </div>
+            </div>
+
+            <div class="toggle-row" style="margin-top: 1.5rem;">
+              <div>
+                <div class="toggle-label">Auto DM New Members</div>
+                <div class="toggle-desc">Send a direct message when someone joins.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="welcome-autodm">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div id="welcome-dm-field" style="display: none; margin-top: 0.75rem;">
+              <label class="form-label">DM Message</label>
+              <textarea class="form-textarea" id="welcome-dm-message" placeholder="Welcome to our server! Feel free to check out the rules and introduce yourself."></textarea>
+            </div>
+
+            <button class="btn btn-primary" onclick="saveWelcome()" style="margin-top: 1.5rem;">Save Welcome Config</button>
           </div>
         </div>
 

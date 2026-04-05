@@ -272,6 +272,16 @@
       -webkit-text-fill-color: transparent;
     }
 
+    .hero h1 .cursor {
+      animation: blink 0.7s infinite;
+      -webkit-text-fill-color: var(--accent-light);
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
     .hero p {
       font-size: 1.15rem;
       color: var(--text-secondary);
@@ -663,7 +673,7 @@
     </div>
     <h1>
       The All-In-One<br>
-      <span class="gradient">Discord Bot</span>
+      <span class="gradient" id="heroAnimatedText"></span><span class="gradient cursor">|</span>
     </h1>
     <p>Moderation, leveling, tickets, music, AI chat, protection, and much more. Everything your server needs in one bot.</p>
     <div class="hero-buttons">
@@ -936,6 +946,36 @@
       mobileMenuBtn.innerHTML = '&#9776;';
       document.body.style.overflow = '';
     }
+
+    // TYPEWRITER ANIMATION
+    const heroWords = ['Discord Bot', 'Moderation Bot', 'Music Bot', 'Leveling Bot', 'AI Chat Bot'];
+    let wordIndex = 0;
+    let charIndex = 0;
+    let isDeleting = false;
+    let typeSpeed = 100;
+    const heroTextEl = document.getElementById('heroAnimatedText');
+
+    function typeWriter() {
+      const current = heroWords[wordIndex];
+      if (isDeleting) {
+        charIndex--;
+        typeSpeed = 50;
+      } else {
+        charIndex++;
+        typeSpeed = 100;
+      }
+      heroTextEl.textContent = current.substring(0, charIndex);
+      if (!isDeleting && charIndex === current.length) {
+        typeSpeed = 2000;
+        isDeleting = true;
+      } else if (isDeleting && charIndex === 0) {
+        isDeleting = false;
+        wordIndex = (wordIndex + 1) % heroWords.length;
+        typeSpeed = 300;
+      }
+      setTimeout(typeWriter, typeSpeed);
+    }
+    typeWriter();
 
     // FETCH BOT STATUS
     async function fetchBotStatus() {

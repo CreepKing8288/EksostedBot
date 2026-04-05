@@ -20,6 +20,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('mobileMenuBtn').addEventListener('click', toggleMobileMenu);
   document.getElementById('sidebarOverlay').addEventListener('click', closeMobileMenu);
 
+  document.getElementById('welcome-embed-enabled').addEventListener('change', (e) => {
+    document.getElementById('welcome-embed-fields').style.display = e.target.checked ? 'block' : 'none';
+  });
+  document.getElementById('welcome-random-images').addEventListener('change', (e) => {
+    document.getElementById('welcome-random-images-field').style.display = e.target.checked ? 'block' : 'none';
+  });
+  document.getElementById('welcome-autodm').addEventListener('change', (e) => {
+    document.getElementById('welcome-dm-field').style.display = e.target.checked ? 'block' : 'none';
+  });
+
   if (user.id !== '1394914695600934932') {
     const statusNav = document.querySelector('.nav-item[data-panel="botstatus"]');
     if (statusNav) statusNav.style.display = 'none';
@@ -223,6 +233,26 @@ function populateWelcome(data) {
   document.getElementById('welcome-enabled').checked = data?.enabled || false;
   document.getElementById('welcome-channel').value = data?.channelId || '';
   document.getElementById('welcome-message').value = data?.description || '';
+  document.getElementById('welcome-mention').checked = data?.mentionUser ?? true;
+  document.getElementById('welcome-embed-enabled').checked = data?.embedEnabled || false;
+  document.getElementById('welcome-embed-title').value = data?.embedTitle || '';
+  document.getElementById('welcome-embed-color').value = data?.embedColor || '#7c3aed';
+  document.getElementById('welcome-embed-desc').value = data?.embedDescription || '';
+  document.getElementById('welcome-embed-footer').value = data?.embedFooter || '';
+  document.getElementById('welcome-embed-image').value = data?.embedImage || '';
+  document.getElementById('welcome-embed-thumbnail').value = data?.embedThumbnail || '';
+  document.getElementById('welcome-embed-author').value = data?.embedAuthor || '';
+  document.getElementById('welcome-random-images').checked = data?.useRandomImage || false;
+  document.getElementById('welcome-random-images-list').value = (data?.randomImages || []).join('\n');
+  document.getElementById('welcome-autodm').checked = data?.autoDM || false;
+  document.getElementById('welcome-dm-message').value = data?.dmMessage || '';
+
+  document.getElementById('welcome-embed-fields').style.display =
+    (data?.embedEnabled) ? 'block' : 'none';
+  document.getElementById('welcome-random-images-field').style.display =
+    (data?.useRandomImage) ? 'block' : 'none';
+  document.getElementById('welcome-dm-field').style.display =
+    (data?.autoDM) ? 'block' : 'none';
 }
 
 function populateAIChat(data) {
@@ -540,6 +570,20 @@ async function saveWelcome() {
     enabled: document.getElementById('welcome-enabled').checked,
     channelId: document.getElementById('welcome-channel').value,
     description: document.getElementById('welcome-message').value,
+    mentionUser: document.getElementById('welcome-mention').checked,
+    embedEnabled: document.getElementById('welcome-embed-enabled').checked,
+    embedTitle: document.getElementById('welcome-embed-title').value,
+    embedColor: document.getElementById('welcome-embed-color').value,
+    embedDescription: document.getElementById('welcome-embed-desc').value,
+    embedFooter: document.getElementById('welcome-embed-footer').value,
+    embedImage: document.getElementById('welcome-embed-image').value,
+    embedThumbnail: document.getElementById('welcome-embed-thumbnail').value,
+    embedAuthor: document.getElementById('welcome-embed-author').value,
+    useRandomImage: document.getElementById('welcome-random-images').checked,
+    randomImages: document.getElementById('welcome-random-images-list').value
+      .split('\n').map(u => u.trim()).filter(u => u),
+    autoDM: document.getElementById('welcome-autodm').checked,
+    dmMessage: document.getElementById('welcome-dm-message').value,
   };
   try {
     const res = await fetch(`/api/guild/${currentGuildId}/config/Welcome`, {
