@@ -547,6 +547,405 @@ app.post('/api/announcement/send', requireOwner, async (req, res) => {
   }
 });
 
+// ===== GIVEAWAY API =====
+app.get('/api/giveaways', requireAuth, async (req, res) => {
+  try {
+    const { guildId } = req.query;
+    if (!guildId) return res.status(400).json({ error: 'guildId required' });
+    const Giveaway = require('./models/Giveaway');
+    const ongoing = await Giveaway.find({ guildId, ongoing: true }).sort({ endTime: 1 });
+    const ended = await Giveaway.find({ guildId, ongoing: false }).sort({ endTime: -1 }).limit(20);
+    res.json({ ongoing, ended });
+  } catch (err) {
+    console.error('Error fetching giveaways:', err);
+    res.status(500).json({ error: 'Failed to fetch giveaways' });
+  }
+});
+
+app.post('/api/giveaway', requireAuth, async (req, res) => {
+  try {
+    const { guildId, prize, duration, winners, channelId, requiredRole } = req.body;
+    if (!guildId || !prize || !duration || !channelId) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const durationMatch = duration.match(/^(?:(\d+)d)?(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/);
+    if (!durationMatch) return res.status(400).json({ error: 'Invalid duration format. Use: 1d2h3m4s' });
+    const [, d, h, m, s] = durationMatch;
+    const durationMs = ((parseInt(d) || 0) * 86400000) + ((parseInt(h) || 0) * 3600000) + ((parseInt(m) || 0) * 60000) + ((parseInt(s) || 0) * 1000);
+    if (durationMs < 30000 || durationMs > 2592000000) return res.status(400).json({ error: 'Duration must be between 30s and 30 days' });
+
+    const channel = client.channels.cache.get(channelId);
+    if (!channel) return res.status(400).json({ error: 'Channel not found' });
+
+    const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+    const endTime = new Date(Date.now() + durationMs);
+    const embed = new EmbedBuilder()
+      .setTitle(`🎉 ${prize}`)
+      .setDescription(`React with the button below to enter!\n**Ends:** <t:${Math.floor(endTime.getTime() / 1000)}:R>\n**Winners:** ${winners || 1}`)
+      .setColor('#7c3aed')
+      .setFooter({ text: `Hosted by ${req.session.user.username}` })
+      .setTimestamp();
+
+    const button = new ButtonBuilder().setCustomId('join_giveaway').setLabel('🎉 Enter Giveaway').setStyle(ButtonStyle.Primary);
+    const row = new ActionRowBuilder().addComponents(button);
+    const msg = await channel.send({ embeds: [embed], components: [row] });
+
+    const Giveaway = require('./models/Giveaway');
+    const giveaway = new Giveaway({
+      guildId,
+      channelId,
+      messageId: msg.id,
+      prize,
+      endTime,
+      winners: winners || 1,
+      participants: [],
+      ongoing: true,
+      requiredRole: requiredRole || null,
+      hostId: req.session.user.id,
+    });
+    await giveaway.save();
+    res.json(giveaway);
+  } catch (err) {
+    console.error('Error creating giveaway:', err);
+    res.status(500).json({ error: `Failed to create giveaway: ${err.message}` });
+  }
+});
+
+app.post('/api/giveaway/end', requireAuth, async (req, res) => {
+  try {
+    const { messageId } = req.body;
+    if (!messageId) return res.status(400).json({ error: 'messageId required' });
+    const Giveaway = require('./models/Giveaway');
+    const giveaway = await Giveaway.findOne({ messageId, ongoing: true });
+    if (!giveaway) return res.status(404).json({ error: 'Giveaway not found or already ended' });
+
+    giveaway.ongoing = false;
+    await giveaway.save();
+
+    try {
+      const channel = client.channels.cache.get(giveaway.channelId);
+      if (channel) {
+        const msg = await channel.messages.fetch(messageId).catch(() => null);
+        if (msg) {
+          const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+          const endedEmbed = EmbedBuilder.from(msg.embeds[0]).setColor('#ef4444').setFooter({ text: 'Giveaway Ended' });
+          const endedButton = new ButtonBuilder().setCustomId('join_giveaway').setLabel('Giveaway Ended').setStyle(ButtonStyle.Secondary).setDisabled(true);
+          const row = new ActionRowBuilder().addComponents(endedButton);
+          await msg.edit({ embeds: [endedEmbed], components: [row] });
+        }
+      }
+    } catch {}
+
+    res.json({ success: true, giveaway });
+  } catch (err) {
+    console.error('Error ending giveaway:', err);
+    res.status(500).json({ error: `Failed to end giveaway: ${err.message}` });
+  }
+});
+
+app.post('/api/giveaway/reroll', requireAuth, async (req, res) => {
+  try {
+    const { messageId } = req.body;
+    if (!messageId) return res.status(400).json({ error: 'messageId required' });
+    const Giveaway = require('./models/Giveaway');
+    const giveaway = await Giveaway.findOne({ messageId, ongoing: false });
+    if (!giveaway) return res.status(404).json({ error: 'Giveaway not found or still ongoing' });
+
+    const participants = giveaway.participants.filter(p => p !== giveaway.hostId);
+    if (participants.length === 0) return res.status(400).json({ error: 'No participants to reroll' });
+
+    const winners = [];
+    const pool = [...participants];
+    for (let i = 0; i < Math.min(giveaway.winners, pool.length); i++) {
+      const idx = Math.floor(Math.random() * pool.length);
+      winners.push(pool.splice(idx, 1)[0]);
+    }
+
+    try {
+      const channel = client.channels.cache.get(giveaway.channelId);
+      if (channel) {
+        const msg = await channel.messages.fetch(messageId).catch(() => null);
+        if (msg) {
+          const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+          const rerolledEmbed = EmbedBuilder.from(msg.embeds[0]).setColor('#f59e0b').setFooter({ text: `Rerolled! Winners: ${winners.map(w => `<@${w}>`).join(', ')}` });
+          const endedButton = new ButtonBuilder().setCustomId('join_giveaway').setLabel('Giveaway Ended').setStyle(ButtonStyle.Secondary).setDisabled(true);
+          const row = new ActionRowBuilder().addComponents(endedButton);
+          await msg.edit({ embeds: [rerolledEmbed], components: [row] });
+          await channel.send(`🎉 New winner(s): ${winners.map(w => `<@${w}>`).join(', ')}! Congratulations!`);
+        }
+      }
+    } catch {}
+
+    res.json({ success: true, winners });
+  } catch (err) {
+    console.error('Error rerolling giveaway:', err);
+    res.status(500).json({ error: `Failed to reroll: ${err.message}` });
+  }
+});
+
+// ===== ANALYTICS API =====
+app.get('/api/analytics/overview', requireAuth, async (req, res) => {
+  try {
+    const { guildId } = req.query;
+    if (!guildId) return res.status(400).json({ error: 'guildId required' });
+
+    const guild = client.guilds.cache.get(guildId);
+    if (!guild) return res.status(404).json({ error: 'Guild not found' });
+
+    const { MemberData } = require('./models/Level');
+    const Giveaway = require('./models/Giveaway');
+
+    const totalMembers = await MemberData.countDocuments({ guildId });
+    const activeMembers = await MemberData.countDocuments({ guildId, totalXp: { $gt: 0 } });
+    const avgLevel = await MemberData.aggregate([{ $match: { guildId } }, { $group: { _id: null, avg: { $avg: '$level' } } }]);
+    const totalVoiceSeconds = await MemberData.aggregate([{ $match: { guildId } }, { $group: { _id: null, total: { $sum: '$voiceSeconds' } } }]);
+    const totalGiveaways = await Giveaway.countDocuments({ guildId });
+    const activeGiveaways = await Giveaway.countDocuments({ guildId, ongoing: true });
+
+    const topUsers = await MemberData.find({ guildId }).sort({ totalXp: -1 }).limit(10).lean();
+    const topVoice = await MemberData.find({ guildId }).sort({ voiceSeconds: -1 }).limit(10).lean();
+
+    res.json({
+      guild: { name: guild.name, memberCount: guild.memberCount, icon: guild.icon },
+      totalMembers,
+      activeMembers,
+      avgLevel: avgLevel.length > 0 ? Math.round(avgLevel[0].avg) : 0,
+      totalVoiceHours: totalVoiceSeconds.length > 0 ? Math.round(totalVoiceSeconds[0].total / 3600) : 0,
+      totalGiveaways,
+      activeGiveaways,
+      topUsers,
+      topVoice,
+    });
+  } catch (err) {
+    console.error('Error fetching analytics:', err);
+    res.status(500).json({ error: 'Failed to fetch analytics' });
+  }
+});
+
+app.get('/api/analytics/activity', requireAuth, async (req, res) => {
+  try {
+    const { guildId } = req.query;
+    if (!guildId) return res.status(400).json({ error: 'guildId required' });
+
+    const { MemberData } = require('./models/Level');
+    const members = await MemberData.find({ guildId, totalXp: { $gt: 0 } }).lean();
+
+    const levelDistribution = {};
+    members.forEach(m => {
+      const bucket = Math.floor(m.level / 5) * 5;
+      const key = `${bucket}-${bucket + 4}`;
+      levelDistribution[key] = (levelDistribution[key] || 0) + 1;
+    });
+
+    const voiceDistribution = {};
+    members.forEach(m => {
+      const hours = Math.floor(m.voiceSeconds / 3600);
+      const bucket = Math.floor(hours / 5) * 5;
+      const key = `${bucket}-${bucket + 4}h`;
+      voiceDistribution[key] = (voiceDistribution[key] || 0) + 1;
+    });
+
+    res.json({
+      levelDistribution,
+      voiceDistribution,
+      totalActive: members.length,
+    });
+  } catch (err) {
+    console.error('Error fetching activity analytics:', err);
+    res.status(500).json({ error: 'Failed to fetch activity analytics' });
+  }
+});
+
+// ===== UTILITY API =====
+app.get('/api/config/backup', requireAuth, async (req, res) => {
+  try {
+    const { guildId } = req.query;
+    if (!guildId) return res.status(400).json({ error: 'guildId required' });
+
+    const modelsWithGuildId = [
+      'SwearFilter', 'AntiSpam', 'LinkFilter', 'Starboard',
+      'CrateConfig', 'TicketSettings', 'AFK',
+      'AIChatConfig', 'ProtectionSettings', 'serverlogs',
+      'ButtonRole', 'ServerStatus', 'AutoRoles',
+    ];
+
+    const backup = { guildId, exportedAt: new Date().toISOString(), configs: {} };
+
+    for (const modelName of modelsWithGuildId) {
+      try {
+        let Model;
+        if (modelName === 'AutoRoles') Model = require('./models/AutoRoles');
+        else Model = require(`./models/${modelName}`);
+        const data = await Model.find({ guildId }).lean();
+        backup.configs[modelName] = data;
+      } catch {
+        backup.configs[modelName] = null;
+      }
+    }
+
+    try {
+      const Welcome = require('./models/welcome');
+      backup.configs.welcome = await Welcome.find({ $or: [{ guildId }, { serverId: guildId }] }).lean();
+    } catch { backup.configs.welcome = null; }
+
+    try {
+      const { GuildSettings, MemberData, LevelRoles } = require('./models/Level');
+      backup.configs.leveling = {
+        settings: await GuildSettings.findOne({ guildId }).lean(),
+        roles: await LevelRoles.find({ guildId }).lean(),
+      };
+    } catch { backup.configs.leveling = null; }
+
+    try {
+      const Giveaway = require('./models/Giveaway');
+      backup.configs.giveaways = await Giveaway.find({ guildId }).lean();
+    } catch { backup.configs.giveaways = null; }
+
+    res.json(backup);
+  } catch (err) {
+    console.error('Error creating backup:', err);
+    res.status(500).json({ error: 'Failed to create backup' });
+  }
+});
+
+app.post('/api/config/restore', requireAuth, async (req, res) => {
+  try {
+    const { guildId, configs } = req.body;
+    if (!guildId || !configs) return res.status(400).json({ error: 'Missing guildId or configs' });
+
+    let restored = 0;
+    for (const [modelName, data] of Object.entries(configs)) {
+      if (!data || !Array.isArray(data)) continue;
+      try {
+        let Model;
+        if (modelName === 'AutoRoles') Model = require('./models/AutoRoles');
+        else if (modelName === 'welcome') Model = require('./models/welcome');
+        else Model = require(`./models/${modelName}`);
+
+        for (const doc of data) {
+          const { _id, ...rest } = doc;
+          await Model.findOneAndUpdate({ guildId: doc.guildId || guildId }, rest, { upsert: true });
+          restored++;
+        }
+      } catch {}
+    }
+
+    res.json({ success: true, restored });
+  } catch (err) {
+    console.error('Error restoring config:', err);
+    res.status(500).json({ error: 'Failed to restore config' });
+  }
+});
+
+app.get('/api/prefix', requireAuth, async (req, res) => {
+  try {
+    const { guildId } = req.query;
+    if (!guildId) return res.status(400).json({ error: 'guildId required' });
+    const PrefixConfig = require('./models/PrefixConfig');
+    let config = await PrefixConfig.findOne({ guildId });
+    if (!config) {
+      config = { guildId, prefix: '!' };
+    }
+    res.json(config);
+  } catch (err) {
+    console.error('Error fetching prefix:', err);
+    res.status(500).json({ error: 'Failed to fetch prefix' });
+  }
+});
+
+app.post('/api/prefix', requireAuth, async (req, res) => {
+  try {
+    const { guildId, prefix } = req.body;
+    if (!guildId || !prefix) return res.status(400).json({ error: 'Missing fields' });
+    const PrefixConfig = require('./models/PrefixConfig');
+    const config = await PrefixConfig.findOneAndUpdate(
+      { guildId },
+      { prefix },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    res.json(config);
+  } catch (err) {
+    console.error('Error saving prefix:', err);
+    res.status(500).json({ error: 'Failed to save prefix' });
+  }
+});
+
+app.get('/api/templates', requireAuth, async (req, res) => {
+  try {
+    const { guildId } = req.query;
+    if (!guildId) return res.status(400).json({ error: 'guildId required' });
+    const MessageTemplate = require('./models/MessageTemplate');
+    const templates = await MessageTemplate.find({ guildId }).sort({ name: 1 });
+    res.json(templates);
+  } catch (err) {
+    console.error('Error fetching templates:', err);
+    res.status(500).json({ error: 'Failed to fetch templates' });
+  }
+});
+
+app.post('/api/templates', requireAuth, async (req, res) => {
+  try {
+    const { guildId, name, content, embedTitle, embedDescription, embedColor, embedFooter, embedImage, embedThumbnail } = req.body;
+    if (!guildId || !name) return res.status(400).json({ error: 'Missing guildId or name' });
+    const MessageTemplate = require('./models/MessageTemplate');
+    const template = await MessageTemplate.findOneAndUpdate(
+      { guildId, name },
+      { $set: { content, embedTitle, embedDescription, embedColor, embedFooter, embedImage, embedThumbnail } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    res.json(template);
+  } catch (err) {
+    console.error('Error saving template:', err);
+    res.status(500).json({ error: 'Failed to save template' });
+  }
+});
+
+app.delete('/api/templates/:id', requireAuth, async (req, res) => {
+  try {
+    const MessageTemplate = require('./models/MessageTemplate');
+    await MessageTemplate.findByIdAndDelete(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting template:', err);
+    res.status(500).json({ error: 'Failed to delete template' });
+  }
+});
+
+app.get('/api/goodbye', requireAuth, async (req, res) => {
+  try {
+    const { guildId } = req.query;
+    if (!guildId) return res.status(400).json({ error: 'guildId required' });
+    const Goodbye = require('./models/Goodbye');
+    let config = await Goodbye.findOne({ guildId });
+    if (!config) {
+      config = new Goodbye({ guildId });
+      await config.save();
+    }
+    res.json(config);
+  } catch (err) {
+    console.error('Error fetching goodbye:', err);
+    res.status(500).json({ error: 'Failed to fetch goodbye config' });
+  }
+});
+
+app.post('/api/goodbye', requireAuth, async (req, res) => {
+  try {
+    const { guildId, enabled, description, channelId, embedTitle, embedColor, embedImage, embedThumbnail, embedFooter } = req.body;
+    if (!guildId) return res.status(400).json({ error: 'guildId required' });
+    const Goodbye = require('./models/Goodbye');
+    const config = await Goodbye.findOneAndUpdate(
+      { guildId },
+      { $set: { enabled, description, channelId, embedTitle, embedColor, embedImage, embedThumbnail, embedFooter } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    res.json(config);
+  } catch (err) {
+    console.error('Error saving goodbye:', err);
+    res.status(500).json({ error: 'Failed to save goodbye config' });
+  }
+});
+
 app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard', 'public', 'dashboard.html'));
 });

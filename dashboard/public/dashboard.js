@@ -471,6 +471,13 @@ function switchPanel(panelName) {
     serverlogs: 'Server Logs',
     autoroles: 'Auto Roles',
     announcement: 'Global Announcement',
+    giveaways: 'Giveaway Manager',
+    analytics: 'Analytics Overview',
+    activity: 'Activity Distribution',
+    prefix: 'Bot Prefix',
+    goodbye: 'Goodbye Messages',
+    templates: 'Message Templates',
+    backup: 'Config Backup',
     botstatus: 'Bot Status',
     buttonroles: 'Button Roles',
   };
@@ -482,6 +489,24 @@ function switchPanel(panelName) {
   }
   if (panelName === 'announcement') {
     loadAnnouncement();
+  }
+  if (panelName === 'giveaways') {
+    loadGiveaways();
+  }
+  if (panelName === 'analytics') {
+    loadAnalytics();
+  }
+  if (panelName === 'activity') {
+    loadActivity();
+  }
+  if (panelName === 'prefix') {
+    loadPrefix();
+  }
+  if (panelName === 'goodbye') {
+    loadGoodbye();
+  }
+  if (panelName === 'templates') {
+    loadTemplates();
   }
 }
 
@@ -903,6 +928,447 @@ async function saveBotStatus() {
     console.error('Save error:', err);
     showToast(`Failed to save: ${err.message}`, 'error');
   }
+}
+
+// ===== GIVEAWAYS =====
+async function loadGiveaways() {
+  if (!currentGuildId) return;
+  try {
+    const res = await fetch(`/api/giveaways?guildId=${currentGuildId}`);
+    if (!res.ok) return;
+    const data = await res.json();
+
+    const activeEl = document.getElementById('gw-active-list');
+    const endedEl = document.getElementById('gw-ended-list');
+
+    if (data.ongoing.length === 0) {
+      activeEl.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 1rem 0;">No active giveaways</p>';
+    } else {
+      activeEl.innerHTML = data.ongoing.map(gw => `
+        <div class="gw-item">
+          <div class="gw-item-info">
+            <div class="gw-item-prize">🎉 ${escapeHtml(gw.prize)}</div>
+            <div class="gw-item-meta">${gw.participants.length} participants · ${gw.winners} winner(s) · Ends <t:${Math.floor(new Date(gw.endTime).getTime() / 1000)}:R></div>
+          </div>
+          <div class="gw-item-actions">
+            <button class="btn btn-secondary" onclick="endGiveaway('${gw.messageId}')">End</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    if (data.ended.length === 0) {
+      endedEl.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 1rem 0;">No ended giveaways</p>';
+    } else {
+      endedEl.innerHTML = data.ended.map(gw => `
+        <div class="gw-item">
+          <div class="gw-item-info">
+            <div class="gw-item-prize">${escapeHtml(gw.prize)}</div>
+            <div class="gw-item-meta">${gw.participants.length} participants · Ended <t:${Math.floor(new Date(gw.endTime).getTime() / 1000)}:R></div>
+          </div>
+          <div class="gw-item-actions">
+            <button class="btn btn-secondary" onclick="rerollGiveaway('${gw.messageId}')">Reroll</button>
+          </div>
+        </div>
+      `).join('');
+    }
+  } catch (err) {
+    console.error('Failed to load giveaways:', err);
+  }
+}
+
+async function createGiveaway() {
+  if (!currentGuildId) return showToast('Select a server first', 'error');
+  const prize = document.getElementById('gw-prize').value.trim();
+  const channelId = document.getElementById('gw-channel').value.trim();
+  const duration = document.getElementById('gw-duration').value.trim();
+  const winners = parseInt(document.getElementById('gw-winners').value) || 1;
+  const requiredRole = document.getElementById('gw-role').value.trim() || null;
+
+  if (!prize || !channelId || !duration) return showToast('Fill in all required fields', 'error');
+
+  try {
+    const res = await fetch('/api/giveaway', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ guildId: currentGuildId, prize, channelId, duration, winners, requiredRole }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    showToast('Giveaway created!', 'success');
+    document.getElementById('gw-prize').value = '';
+    document.getElementById('gw-channel').value = '';
+    document.getElementById('gw-duration').value = '';
+    document.getElementById('gw-winners').value = '1';
+    document.getElementById('gw-role').value = '';
+    loadGiveaways();
+  } catch (err) {
+    showToast(`Failed: ${err.message}`, 'error');
+  }
+}
+
+async function endGiveaway(messageId) {
+  try {
+    const res = await fetch('/api/giveaway/end', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messageId }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    showToast('Giveaway ended', 'success');
+    loadGiveaways();
+  } catch (err) {
+    showToast(`Failed: ${err.message}`, 'error');
+  }
+}
+
+async function rerollGiveaway(messageId) {
+  try {
+    const res = await fetch('/api/giveaway/reroll', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messageId }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    showToast('Giveaway rerolled', 'success');
+    loadGiveaways();
+  } catch (err) {
+    showToast(`Failed: ${err.message}`, 'error');
+  }
+}
+
+// ===== ANALYTICS =====
+async function loadAnalytics() {
+  if (!currentGuildId) return;
+  try {
+    const res = await fetch(`/api/analytics/overview?guildId=${currentGuildId}`);
+    if (!res.ok) return;
+    const data = await res.json();
+
+    document.getElementById('analytics-stats').innerHTML = `
+      <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(124, 58, 237, 0.1); color: var(--accent-light);">👥</div>
+        <div><div class="stat-label">Total Members</div><div class="stat-value">${data.guild.memberCount}</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--green);">💬</div>
+        <div><div class="stat-label">Active Chatters</div><div class="stat-value">${data.activeMembers}</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1); color: var(--blue);">📊</div>
+        <div><div class="stat-label">Average Level</div><div class="stat-value">${data.avgLevel}</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(236, 72, 153, 0.1); color: var(--pink);">🎙️</div>
+        <div><div class="stat-label">Total Voice Hours</div><div class="stat-value">${data.totalVoiceHours}h</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(245, 158, 11, 0.1); color: var(--yellow);">🎁</div>
+        <div><div class="stat-label">Total Giveaways</div><div class="stat-value">${data.totalGiveaways}</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(6, 182, 212, 0.1); color: var(--cyan);">⏳</div>
+        <div><div class="stat-label">Active Giveaways</div><div class="stat-value">${data.activeGiveaways}</div></div>
+      </div>
+    `;
+
+    const topUsersEl = document.getElementById('analytics-top-users');
+    if (data.topUsers.length === 0) {
+      topUsersEl.innerHTML = '<p style="color: var(--text-muted); font-size: 0.85rem;">No data yet</p>';
+    } else {
+      topUsersEl.innerHTML = data.topUsers.map((u, i) => `
+        <div class="analytics-user-row">
+          <span class="analytics-user-rank">${i + 1}</span>
+          <span class="analytics-user-name">${escapeHtml(u.userId)}</span>
+          <span class="analytics-user-stat">Lvl ${u.level}</span>
+        </div>
+      `).join('');
+    }
+
+    const topVoiceEl = document.getElementById('analytics-top-voice');
+    if (data.topVoice.length === 0) {
+      topVoiceEl.innerHTML = '<p style="color: var(--text-muted); font-size: 0.85rem;">No data yet</p>';
+    } else {
+      topVoiceEl.innerHTML = data.topVoice.map((u, i) => {
+        const hours = Math.floor(u.voiceSeconds / 3600);
+        const mins = Math.floor((u.voiceSeconds % 3600) / 60);
+        return `
+        <div class="analytics-user-row">
+          <span class="analytics-user-rank">${i + 1}</span>
+          <span class="analytics-user-name">${escapeHtml(u.userId)}</span>
+          <span class="analytics-user-stat">${hours}h ${mins}m</span>
+        </div>`;
+      }).join('');
+    }
+  } catch (err) {
+    console.error('Failed to load analytics:', err);
+  }
+}
+
+async function loadActivity() {
+  if (!currentGuildId) return;
+  try {
+    const res = await fetch(`/api/analytics/activity?guildId=${currentGuildId}`);
+    if (!res.ok) return;
+    const data = await res.json();
+
+    renderBarChart('activity-level-chart', data.levelDistribution);
+    renderBarChart('activity-voice-chart', data.voiceDistribution);
+  } catch (err) {
+    console.error('Failed to load activity:', err);
+  }
+}
+
+function renderBarChart(containerId, distribution) {
+  const container = document.getElementById(containerId);
+  if (!distribution || Object.keys(distribution).length === 0) {
+    container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 1rem 0;">No data</p>';
+    return;
+  }
+
+  const maxVal = Math.max(...Object.values(distribution));
+  container.innerHTML = `<div class="analytics-bar-chart">${Object.entries(distribution).map(([key, val]) => `
+    <div class="analytics-bar-row">
+      <span class="analytics-bar-label">${key}</span>
+      <div class="analytics-bar-track">
+        <div class="analytics-bar-fill" style="width: ${(val / maxVal) * 100}%"></div>
+      </div>
+      <span class="analytics-bar-value">${val}</span>
+    </div>
+  `).join('')}</div>`;
+}
+
+// ===== PREFIX =====
+async function loadPrefix() {
+  if (!currentGuildId) return;
+  try {
+    const res = await fetch(`/api/prefix?guildId=${currentGuildId}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    document.getElementById('prefix-input').value = data.prefix || '!';
+  } catch (err) {
+    console.error('Failed to load prefix:', err);
+  }
+}
+
+async function savePrefix() {
+  if (!currentGuildId) return showToast('Select a server first', 'error');
+  const prefix = document.getElementById('prefix-input').value.trim();
+  if (!prefix) return showToast('Prefix cannot be empty', 'error');
+
+  try {
+    const res = await fetch('/api/prefix', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ guildId: currentGuildId, prefix }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    showToast('Prefix updated!', 'success');
+  } catch (err) {
+    showToast(`Failed: ${err.message}`, 'error');
+  }
+}
+
+// ===== GOODBYE =====
+async function loadGoodbye() {
+  if (!currentGuildId) return;
+  try {
+    const res = await fetch(`/api/goodbye?guildId=${currentGuildId}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    document.getElementById('goodbye-enabled').checked = data.enabled || false;
+    document.getElementById('goodbye-channel').value = data.channelId || '';
+    document.getElementById('goodbye-message').value = data.description || '';
+    document.getElementById('goodbye-title').value = data.embedTitle || '';
+    document.getElementById('goodbye-color').value = data.embedColor || '#ef4444';
+    document.getElementById('goodbye-footer').value = data.embedFooter || '';
+    document.getElementById('goodbye-image').value = data.embedImage || '';
+    document.getElementById('goodbye-thumbnail').value = data.embedThumbnail || '';
+  } catch (err) {
+    console.error('Failed to load goodbye:', err);
+  }
+}
+
+async function saveGoodbye() {
+  if (!currentGuildId) return showToast('Select a server first', 'error');
+  const payload = {
+    guildId: currentGuildId,
+    enabled: document.getElementById('goodbye-enabled').checked,
+    description: document.getElementById('goodbye-message').value,
+    channelId: document.getElementById('goodbye-channel').value,
+    embedTitle: document.getElementById('goodbye-title').value,
+    embedColor: document.getElementById('goodbye-color').value,
+    embedFooter: document.getElementById('goodbye-footer').value,
+    embedImage: document.getElementById('goodbye-image').value,
+    embedThumbnail: document.getElementById('goodbye-thumbnail').value,
+  };
+
+  try {
+    const res = await fetch('/api/goodbye', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    showToast('Goodbye config saved!', 'success');
+  } catch (err) {
+    showToast(`Failed: ${err.message}`, 'error');
+  }
+}
+
+// ===== TEMPLATES =====
+let editingTemplateId = null;
+
+async function loadTemplates() {
+  if (!currentGuildId) return;
+  try {
+    const res = await fetch(`/api/templates?guildId=${currentGuildId}`);
+    if (!res.ok) return;
+    const templates = await res.json();
+    const listEl = document.getElementById('templates-list');
+
+    if (templates.length === 0) {
+      listEl.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 1rem 0;">No templates yet. Create one above.</p>';
+    } else {
+      listEl.innerHTML = templates.map(t => `
+        <div class="tpl-item">
+          <span class="tpl-item-name">${escapeHtml(t.name)}</span>
+          <div class="tpl-item-actions">
+            <button class="btn btn-secondary" onclick="editTemplate('${t._id}')">Edit</button>
+            <button class="btn btn-secondary" style="color: var(--red);" onclick="deleteTemplate('${t._id}')">Delete</button>
+          </div>
+        </div>
+      `).join('');
+    }
+  } catch (err) {
+    console.error('Failed to load templates:', err);
+  }
+}
+
+function addTemplateForm() {
+  editingTemplateId = null;
+  document.getElementById('tpl-name').value = '';
+  document.getElementById('tpl-content').value = '';
+  document.getElementById('tpl-title').value = '';
+  document.getElementById('tpl-desc').value = '';
+  document.getElementById('tpl-color').value = '#7c3aed';
+  document.getElementById('tpl-footer').value = '';
+  document.getElementById('tpl-image').value = '';
+  document.getElementById('tpl-thumbnail').value = '';
+  document.getElementById('template-editor').style.display = 'block';
+}
+
+async function editTemplate(id) {
+  if (!currentGuildId) return;
+  try {
+    const res = await fetch(`/api/templates?guildId=${currentGuildId}`);
+    if (!res.ok) return;
+    const templates = await res.json();
+    const t = templates.find(t => t._id === id);
+    if (!t) return;
+
+    editingTemplateId = id;
+    document.getElementById('tpl-name').value = t.name || '';
+    document.getElementById('tpl-content').value = t.content || '';
+    document.getElementById('tpl-title').value = t.embedTitle || '';
+    document.getElementById('tpl-desc').value = t.embedDescription || '';
+    document.getElementById('tpl-color').value = t.embedColor || '#7c3aed';
+    document.getElementById('tpl-footer').value = t.embedFooter || '';
+    document.getElementById('tpl-image').value = t.embedImage || '';
+    document.getElementById('tpl-thumbnail').value = t.embedThumbnail || '';
+    document.getElementById('template-editor').style.display = 'block';
+  } catch (err) {
+    console.error('Failed to load template:', err);
+  }
+}
+
+async function saveTemplate() {
+  if (!currentGuildId) return showToast('Select a server first', 'error');
+  const name = document.getElementById('tpl-name').value.trim();
+  if (!name) return showToast('Template name is required', 'error');
+
+  const payload = {
+    guildId: currentGuildId,
+    name,
+    content: document.getElementById('tpl-content').value,
+    embedTitle: document.getElementById('tpl-title').value,
+    embedDescription: document.getElementById('tpl-desc').value,
+    embedColor: document.getElementById('tpl-color').value,
+    embedFooter: document.getElementById('tpl-footer').value,
+    embedImage: document.getElementById('tpl-image').value,
+    embedThumbnail: document.getElementById('tpl-thumbnail').value,
+  };
+
+  try {
+    const res = await fetch('/api/templates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    showToast('Template saved!', 'success');
+    document.getElementById('template-editor').style.display = 'none';
+    loadTemplates();
+  } catch (err) {
+    showToast(`Failed: ${err.message}`, 'error');
+  }
+}
+
+async function deleteTemplate(id) {
+  if (!confirm('Delete this template?')) return;
+  try {
+    const res = await fetch(`/api/templates/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(await res.text());
+    showToast('Template deleted', 'success');
+    loadTemplates();
+  } catch (err) {
+    showToast(`Failed: ${err.message}`, 'error');
+  }
+}
+
+// ===== CONFIG BACKUP =====
+async function exportBackup() {
+  if (!currentGuildId) return showToast('Select a server first', 'error');
+  try {
+    showToast('Generating backup...', 'success');
+    const res = await fetch(`/api/config/backup?guildId=${currentGuildId}`);
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `backup-${currentGuildId}-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Backup downloaded!', 'success');
+  } catch (err) {
+    showToast(`Failed: ${err.message}`, 'error');
+  }
+}
+
+async function importBackup(event) {
+  if (!currentGuildId) return showToast('Select a server first', 'error');
+  const file = event.target.files[0];
+  if (!file) return;
+
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if (!data.configs) throw new Error('Invalid backup file');
+
+    showToast('Restoring backup...', 'success');
+    const res = await fetch('/api/config/restore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ guildId: currentGuildId, configs: data.configs }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const result = await res.json();
+    showToast(`Restored ${result.restored} settings!`, 'success');
+  } catch (err) {
+    showToast(`Failed: ${err.message}`, 'error');
+  }
+  event.target.value = '';
 }
 
 function escapeHtml(text) {

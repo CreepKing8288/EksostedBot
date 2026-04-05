@@ -84,6 +84,39 @@
         </div>
 
         <div class="nav-section">
+          <div class="nav-section-title">Utility</div>
+          <a href="#" class="nav-item" data-panel="prefix">
+            <span class="nav-icon">⌨️</span> Prefix
+          </a>
+          <a href="#" class="nav-item" data-panel="goodbye">
+            <span class="nav-icon">👋</span> Goodbye
+          </a>
+          <a href="#" class="nav-item" data-panel="templates">
+            <span class="nav-icon">📝</span> Templates
+          </a>
+          <a href="#" class="nav-item" data-panel="backup">
+            <span class="nav-icon">💾</span> Config Backup
+          </a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Engagement</div>
+          <a href="#" class="nav-item" data-panel="giveaways">
+            <span class="nav-icon">🎁</span> Giveaways
+          </a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Analytics</div>
+          <a href="#" class="nav-item" data-panel="analytics">
+            <span class="nav-icon">📊</span> Overview
+          </a>
+          <a href="#" class="nav-item" data-panel="activity">
+            <span class="nav-icon">📈</span> Activity
+          </a>
+        </div>
+
+        <div class="nav-section">
           <div class="nav-section-title">Bot Modification</div>
           <a href="#" class="nav-item" data-panel="botstatus">
             <span class="nav-icon">🟢</span> Bot Status
@@ -606,6 +639,232 @@
         <div class="panel" id="panel-vc-leaderboard" style="display:none;">
           <div class="panel-header">
             <h2>VC Leaderboard</h2>
+          </div>
+        </div>
+
+        <!-- ANALYTICS OVERVIEW -->
+        <div class="panel" id="panel-analytics">
+          <div class="panel-header">
+            <h2>Analytics Overview</h2>
+            <p>Key metrics and insights for your server.</p>
+          </div>
+          <div id="analytics-overview-content">
+            <div class="stats-grid" id="analytics-stats"></div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+              <div class="card" style="max-width: 100%;">
+                <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 1rem;">🏆 Top Chatters</h3>
+                <div id="analytics-top-users"></div>
+              </div>
+              <div class="card" style="max-width: 100%;">
+                <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 1rem;">🎙️ Top Voice</h3>
+                <div id="analytics-top-voice"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ACTIVITY ANALYTICS -->
+        <div class="panel" id="panel-activity">
+          <div class="panel-header">
+            <h2>Activity Distribution</h2>
+            <p>See how activity is distributed across levels and voice time.</p>
+          </div>
+          <div class="card" style="max-width: 900px;">
+            <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 1rem;">Level Distribution</h3>
+            <div id="activity-level-chart" style="margin-bottom: 2rem;"></div>
+            <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 1rem;">Voice Time Distribution</h3>
+            <div id="activity-voice-chart"></div>
+          </div>
+        </div>
+
+        <!-- GIVEAWAYS -->
+        <div class="panel" id="panel-giveaways">
+          <div class="panel-header">
+            <h2>Giveaway Manager</h2>
+            <p>Create, manage, and track giveaways across your server.</p>
+          </div>
+          <div class="card" style="max-width: 900px;">
+            <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 1rem;">Create Giveaway</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Prize</label>
+                <input type="text" class="form-input" id="gw-prize" placeholder="e.g. Discord Nitro">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Channel ID</label>
+                <input type="text" class="form-input" id="gw-channel" placeholder="Channel ID to post in">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Duration</label>
+                <input type="text" class="form-input" id="gw-duration" placeholder="e.g. 1d2h30m">
+                <small style="color: var(--text-muted); font-size: 0.7rem;">Format: 1d2h3m4s (days, hours, minutes, seconds)</small>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Winners</label>
+                <input type="number" class="form-input" id="gw-winners" min="1" max="50" value="1">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Required Role ID (optional)</label>
+              <input type="text" class="form-input" id="gw-role" placeholder="Users need this role to enter">
+            </div>
+            <button class="btn btn-primary" onclick="createGiveaway()">🎉 Create Giveaway</button>
+          </div>
+
+          <div class="card" style="max-width: 900px; margin-top: 1.5rem;">
+            <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 1rem;">Active Giveaways</h3>
+            <div id="gw-active-list"></div>
+          </div>
+
+          <div class="card" style="max-width: 900px; margin-top: 1.5rem;">
+            <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 1rem;">Recent Ended Giveaways</h3>
+            <div id="gw-ended-list"></div>
+          </div>
+        </div>
+
+        <!-- PREFIX -->
+        <div class="panel" id="panel-prefix">
+          <div class="panel-header">
+            <h2>Bot Prefix</h2>
+            <p>Set a custom prefix for this server.</p>
+          </div>
+          <div class="card">
+            <div class="form-group">
+              <label class="form-label">Prefix</label>
+              <input type="text" class="form-input" id="prefix-input" placeholder="!" maxlength="10">
+            </div>
+            <button class="btn btn-primary" onclick="savePrefix()">Save Prefix</button>
+          </div>
+        </div>
+
+        <!-- GOODBYE -->
+        <div class="panel" id="panel-goodbye">
+          <div class="panel-header">
+            <h2>Goodbye Messages</h2>
+            <p>Configure farewell messages when members leave.</p>
+          </div>
+          <div class="card" style="max-width: 900px;">
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Enable Goodbye Messages</div>
+                <div class="toggle-desc">Send a message when a member leaves the server.</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="goodbye-enabled">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Channel ID</label>
+              <input type="text" class="form-input" id="goodbye-channel" placeholder="Channel ID to send goodbye messages">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Message</label>
+              <textarea class="form-textarea" id="goodbye-message" placeholder="Goodbye {member} from {server}"></textarea>
+              <small style="color: var(--text-muted); font-size: 0.7rem;">Variables: <code style="color: var(--accent-light);">{member}</code> <code style="color: var(--accent-light);">{server}</code> <code style="color: var(--accent-light);">{memberCount}</code></small>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Embed Title</label>
+                <input type="text" class="form-input" id="goodbye-title" placeholder="Goodbye!">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Embed Color</label>
+                <input type="color" class="form-input" id="goodbye-color" value="#ef4444" style="height: 40px; padding: 4px;">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Footer Text</label>
+              <input type="text" class="form-input" id="goodbye-footer" placeholder="Footer text">
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Image URL</label>
+                <input type="text" class="form-input" id="goodbye-image" placeholder="https://...">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Thumbnail URL</label>
+                <input type="text" class="form-input" id="goodbye-thumbnail" placeholder="https://...">
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="saveGoodbye()">Save Goodbye Config</button>
+          </div>
+        </div>
+
+        <!-- TEMPLATES -->
+        <div class="panel" id="panel-templates">
+          <div class="panel-header">
+            <h2>Message Templates</h2>
+            <p>Create reusable embed templates for announcements, rules, and more.</p>
+          </div>
+          <div class="card" style="max-width: 900px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+              <h3 style="font-size: 0.95rem; font-weight: 700;">Saved Templates</h3>
+              <button class="btn btn-primary" style="margin-top: 0; padding: 0.4rem 1rem; font-size: 0.8rem;" onclick="addTemplateForm()">+ New Template</button>
+            </div>
+            <div id="templates-list"></div>
+            <div id="template-editor" style="display: none; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border);">
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Template Name</label>
+                  <input type="text" class="form-input" id="tpl-name" placeholder="e.g. Rules, Welcome, Announcement">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Embed Color</label>
+                  <input type="color" class="form-input" id="tpl-color" value="#7c3aed" style="height: 40px; padding: 4px;">
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Plain Content</label>
+                <textarea class="form-textarea" id="tpl-content" placeholder="Text above the embed (optional)"></textarea>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Embed Title</label>
+                <input type="text" class="form-input" id="tpl-title" placeholder="Embed title">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Embed Description</label>
+                <textarea class="form-textarea" id="tpl-desc" placeholder="Embed body text"></textarea>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Footer Text</label>
+                <input type="text" class="form-input" id="tpl-footer" placeholder="Footer text">
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Image URL</label>
+                  <input type="text" class="form-input" id="tpl-image" placeholder="https://...">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Thumbnail URL</label>
+                  <input type="text" class="form-input" id="tpl-thumbnail" placeholder="https://...">
+                </div>
+              </div>
+              <div style="display: flex; gap: 0.75rem;">
+                <button class="btn btn-primary" onclick="saveTemplate()">Save Template</button>
+                <button class="btn btn-secondary" onclick="document.getElementById('template-editor').style.display='none'">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CONFIG BACKUP -->
+        <div class="panel" id="panel-backup">
+          <div class="panel-header">
+            <h2>Config Backup & Restore</h2>
+            <p>Export all server settings as JSON or import a backup.</p>
+          </div>
+          <div class="card" style="max-width: 900px;">
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 2rem;">
+              <button class="btn btn-primary" onclick="exportBackup()">📥 Export Backup</button>
+              <label class="btn btn-secondary" style="margin-top: 1.5rem; cursor: pointer;">
+                📤 Import Backup
+                <input type="file" accept=".json" style="display: none;" onchange="importBackup(event)">
+              </label>
+            </div>
+            <div id="backup-status"></div>
           </div>
         </div>
 
