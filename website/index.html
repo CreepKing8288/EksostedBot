@@ -675,7 +675,7 @@
       The All-In-One<br>
       <span class="gradient" id="heroAnimatedText"></span><span class="gradient cursor">|</span>
     </h1>
-    <p>Moderation, leveling, tickets, music, AI chat, protection, and much more. Everything your server needs in one bot.</p>
+    <p>Moderation, leveling, giveaways, music, AI chat, analytics, and more. Manage your entire community from a beautiful dashboard.</p>
     <div class="hero-buttons">
       <a href="https://discord.com/oauth2/authorize?client_id=1488409951956369510&permissions=8&integration_type=0&scope=bot" class="btn btn-primary">Invite to Discord</a>
       <a href="#features" class="btn btn-secondary">Explore Features</a>
@@ -686,8 +686,16 @@
         <div class="label">Commands</div>
       </div>
       <div class="hero-stat">
-        <div class="number">15+</div>
+        <div class="number">20+</div>
         <div class="label">Features</div>
+      </div>
+      <div class="hero-stat">
+        <div class="number" id="heroServerCount">-</div>
+        <div class="label">Servers</div>
+      </div>
+      <div class="hero-stat">
+        <div class="number" id="heroUserCount">-</div>
+        <div class="label">Users</div>
       </div>
       <div class="hero-stat">
         <div class="number">24/7</div>
@@ -719,16 +727,38 @@
       <div class="feature-card fade-in">
         <div class="feature-icon" style="background: rgba(124, 58, 237, 0.1); color: var(--accent-light);">📈</div>
         <h3>Leveling & XP</h3>
-        <p>Message-based XP with configurable rates, level-up announcements, and auto role rewards.</p>
+        <p>Message and voice XP with configurable rates, level-up announcements, and auto role rewards.</p>
         <div class="feature-tags">
           <span class="feature-tag">XP System</span>
-          <span class="feature-tag">Level Roles</span>
+          <span class="feature-tag">Voice XP</span>
           <span class="feature-tag">Leaderboard</span>
         </div>
       </div>
 
       <div class="feature-card fade-in">
-        <div class="feature-icon" style="background: rgba(236, 72, 153, 0.1); color: var(--pink);">🎁</div>
+        <div class="feature-icon" style="background: rgba(245, 158, 11, 0.1); color: var(--yellow);">🎁</div>
+        <h3>Giveaways</h3>
+        <p>Create and manage giveaways from the dashboard with auto winner selection and rerolls.</p>
+        <div class="feature-tags">
+          <span class="feature-tag">Auto End</span>
+          <span class="feature-tag">Reroll</span>
+          <span class="feature-tag">Role Gate</span>
+        </div>
+      </div>
+
+      <div class="feature-card fade-in">
+        <div class="feature-icon" style="background: rgba(236, 72, 153, 0.1); color: var(--pink);">📊</div>
+        <h3>Analytics</h3>
+        <p>Track server activity with charts for message counts, voice hours, and level distribution.</p>
+        <div class="feature-tags">
+          <span class="feature-tag">Charts</span>
+          <span class="feature-tag">Top Users</span>
+          <span class="feature-tag">Insights</span>
+        </div>
+      </div>
+
+      <div class="feature-card fade-in">
+        <div class="feature-icon" style="background: rgba(245, 158, 11, 0.1); color: var(--yellow);">🎉</div>
         <h3>Crate Drops</h3>
         <p>Auto and manual crate drops with configurable sizes, claim limits, and expiration timers.</p>
         <div class="feature-tags">
@@ -823,6 +853,50 @@
           <span class="feature-tag">Custom Reason</span>
           <span class="feature-tag">Auto Remove</span>
           <span class="feature-tag">Mention Alert</span>
+        </div>
+      </div>
+
+      <div class="feature-card fade-in">
+        <div class="feature-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--green);">👋</div>
+        <h3>Welcome & Goodbye</h3>
+        <p>Rich embed messages with rotating images, DMs, and full customization for join/leave events.</p>
+        <div class="feature-tags">
+          <span class="feature-tag">Embeds</span>
+          <span class="feature-tag">Auto DM</span>
+          <span class="feature-tag">Images</span>
+        </div>
+      </div>
+
+      <div class="feature-card fade-in">
+        <div class="feature-icon" style="background: rgba(236, 72, 153, 0.1); color: var(--pink);">📝</div>
+        <h3>Message Templates</h3>
+        <p>Create reusable embed templates for announcements, rules, and recurring messages.</p>
+        <div class="feature-tags">
+          <span class="feature-tag">Reusable</span>
+          <span class="feature-tag">Embeds</span>
+          <span class="feature-tag">Quick Send</span>
+        </div>
+      </div>
+
+      <div class="feature-card fade-in">
+        <div class="feature-icon" style="background: rgba(59, 130, 246, 0.1); color: var(--blue);">💾</div>
+        <h3>Config Backup</h3>
+        <p>Export and import all server settings as JSON. Never lose your configuration.</p>
+        <div class="feature-tags">
+          <span class="feature-tag">Export</span>
+          <span class="feature-tag">Import</span>
+          <span class="feature-tag">Full Backup</span>
+        </div>
+      </div>
+
+      <div class="feature-card fade-in">
+        <div class="feature-icon" style="background: rgba(239, 68, 68, 0.1); color: var(--red);">📢</div>
+        <h3>Global Announcements</h3>
+        <p>Broadcast rich embed messages to every server the bot is in with one click.</p>
+        <div class="feature-tags">
+          <span class="feature-tag">Broadcast</span>
+          <span class="feature-tag">Embeds</span>
+          <span class="feature-tag">Stats</span>
         </div>
       </div>
 
@@ -986,14 +1060,29 @@
         if (data.state) {
           const display = data.state
             .replace(/\{userCount\}/g, '')
-            .replace(/\{serverCount\}/g, '');
-          if (display.trim()) {
-            document.getElementById('heroStatusText').textContent = display.trim();
+            .replace(/\{serverCount\}/g, '')
+            .trim();
+          const ignoreWords = ['people.', 'people', 'users', 'users.', ''];
+          if (display && !ignoreWords.includes(display.toLowerCase())) {
+            document.getElementById('heroStatusText').textContent = display;
           }
         }
       } catch {}
     }
     fetchBotStatus();
+
+    // FETCH SERVER/USER COUNT
+    async function fetchCounts() {
+      try {
+        const res = await fetch('/api/public/guilds');
+        if (!res.ok) return;
+        const guilds = await res.json();
+        const totalUsers = guilds.reduce((sum, g) => sum + (g.memberCount || 0), 0);
+        document.getElementById('heroServerCount').textContent = guilds.length;
+        document.getElementById('heroUserCount').textContent = totalUsers.toLocaleString();
+      } catch {}
+    }
+    fetchCounts();
 
     // TAB SWITCHING
     function showTab(name) {
