@@ -88,6 +88,9 @@
           <a href="#" class="nav-item" data-panel="botstatus">
             <span class="nav-icon">🟢</span> Bot Status
           </a>
+          <a href="#" class="nav-item" data-panel="announcement">
+            <span class="nav-icon">📢</span> Global Announcement
+          </a>
         </div>
 
         <div class="nav-section">
@@ -603,6 +606,94 @@
         <div class="panel" id="panel-vc-leaderboard" style="display:none;">
           <div class="panel-header">
             <h2>VC Leaderboard</h2>
+          </div>
+        </div>
+
+        <!-- GLOBAL ANNOUNCEMENT PANEL -->
+        <div class="panel" id="panel-announcement">
+          <div class="panel-header">
+            <h2>Global Announcement</h2>
+            <p>Send an announcement to all servers the bot is in.</p>
+          </div>
+
+          <div class="card" style="max-width: 900px;">
+            <div class="form-group">
+              <label class="form-label">Message Content</label>
+              <textarea class="form-textarea" id="ann-content" placeholder="Plain text message (optional)"></textarea>
+            </div>
+
+            <div style="margin-top: 1.5rem; margin-bottom: 1rem;">
+              <h3 style="font-size: 1rem; font-weight: 700;">Embed</h3>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Embed Title</label>
+                <input type="text" class="form-input" id="ann-title" placeholder="Announcement title">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Embed Color</label>
+                <input type="color" class="form-input" id="ann-color" value="#7c3aed" style="height: 40px; padding: 4px;">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Embed Description</label>
+              <textarea class="form-textarea" id="ann-desc" placeholder="Main announcement content in the embed"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Footer Text</label>
+              <input type="text" class="form-input" id="ann-footer" placeholder="Footer text (optional)">
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Image URL</label>
+                <input type="text" class="form-input" id="ann-image" placeholder="https://...">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Thumbnail URL</label>
+                <input type="text" class="form-input" id="ann-thumbnail" placeholder="https://...">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Target Channel ID (optional)</label>
+              <input type="text" class="form-input" id="ann-channel" placeholder="Leave empty to auto-detect the best channel">
+              <small style="color: var(--text-muted); font-size: 0.7rem;">If empty, the bot will try the system channel or first text channel it can send to.</small>
+            </div>
+
+            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+              <button class="btn btn-primary" onclick="sendAnnouncement()">📢 Send to All Servers</button>
+              <button class="btn btn-secondary" onclick="saveAnnouncement()">💾 Save Draft</button>
+            </div>
+
+            <div id="ann-stats" style="margin-top: 1.5rem; display: none;">
+              <div class="stats-grid" style="margin-bottom: 0;">
+                <div class="stat-card">
+                  <div class="stat-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--green);">✅</div>
+                  <div>
+                    <div class="stat-label">Sent</div>
+                    <div class="stat-value" id="ann-sent">0</div>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon" style="background: rgba(239, 68, 68, 0.1); color: var(--red);">❌</div>
+                  <div>
+                    <div class="stat-label">Failed</div>
+                    <div class="stat-value" id="ann-failed">0</div>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1); color: var(--blue);">📊</div>
+                  <div>
+                    <div class="stat-label">Total Servers</div>
+                    <div class="stat-value" id="ann-total">0</div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

@@ -435,6 +435,118 @@ app.get('/api/status/public', async (req, res) => {
   }
 });
 
+// Global Announcement API - owner only
+app.get('/api/announcement', requireOwner, async (req, res) => {
+  try {
+    const Announcement = require('./models/Announcement');
+    let ann = await Announcement.findById('global');
+    if (!ann) {
+      ann = new Announcement();
+      await ann.save();
+    }
+    res.json(ann);
+  } catch (err) {
+    console.error('Error fetching announcement:', err);
+    res.status(500).json({ error: 'Failed to fetch announcement' });
+  }
+});
+
+app.post('/api/announcement', requireOwner, async (req, res) => {
+  try {
+    const Announcement = require('./models/Announcement');
+    let ann = await Announcement.findById('global');
+    if (!ann) {
+      ann = new Announcement();
+    }
+    const { content, embedTitle, embedDescription, embedColor, embedFooter, embedImage, embedThumbnail, channelId } = req.body;
+    if (content !== undefined) ann.content = content;
+    if (embedTitle !== undefined) ann.embedTitle = embedTitle;
+    if (embedDescription !== undefined) ann.embedDescription = embedDescription;
+    if (embedColor !== undefined) ann.embedColor = embedColor;
+    if (embedFooter !== undefined) ann.embedFooter = embedFooter;
+    if (embedImage !== undefined) ann.embedImage = embedImage;
+    if (embedThumbnail !== undefined) ann.embedThumbnail = embedThumbnail;
+    if (channelId !== undefined) ann.channelId = channelId;
+    ann.updatedBy = req.session.user.id;
+    await ann.save();
+    res.json(ann);
+  } catch (err) {
+    console.error('Error saving announcement:', err);
+    res.status(500).json({ error: 'Failed to save announcement' });
+  }
+});
+
+app.post('/api/announcement/send', requireOwner, async (req, res) => {
+  try {
+    const Announcement = require('./models/Announcement');
+    let ann = await Announcement.findById('global');
+    if (!ann) {
+      ann = new Announcement();
+    }
+
+    const { content, embedTitle, embedDescription, embedColor, embedFooter, embedImage, embedThumbnail, channelId } = req.body;
+    if (content !== undefined) ann.content = content;
+    if (embedTitle !== undefined) ann.embedTitle = embedTitle;
+    if (embedDescription !== undefined) ann.embedDescription = embedDescription;
+    if (embedColor !== undefined) ann.embedColor = embedColor;
+    if (embedFooter !== undefined) ann.embedFooter = embedFooter;
+    if (embedImage !== undefined) ann.embedImage = embedImage;
+    if (embedThumbnail !== undefined) ann.embedThumbnail = embedThumbnail;
+    if (channelId !== undefined) ann.channelId = channelId;
+    ann.sentBy = req.session.user.id;
+    ann.sentAt = new Date();
+
+    const { EmbedBuilder } = require('discord.js');
+    const embed = new EmbedBuilder();
+    let hasEmbed = false;
+
+    if (embedTitle) { embed.setTitle(embedTitle); hasEmbed = true; }
+    if (embedDescription) { embed.setDescription(embedDescription); }
+    if (embedColor) { embed.setColor(embedColor); }
+    if (embedFooter) { embed.setFooter({ text: embedFooter }); }
+    if (embedImage) { embed.setImage(embedImage); }
+    if (embedThumbnail) { embed.setThumbnail(embedThumbnail); }
+
+    let sent = 0;
+    let failed = 0;
+    const guilds = client.guilds.cache;
+
+    for (const [, guild] of guilds) {
+      try {
+        let channel;
+        if (channelId) {
+          channel = guild.channels.cache.get(channelId);
+        }
+        if (!channel) {
+          channel = guild.systemChannel || guild.channels.cache.find(c => c.type === 0 && c.permissionsFor(guild.members.me)?.has('SendMessages'));
+        }
+        if (!channel) {
+          failed++;
+          continue;
+        }
+
+        const sendOptions = {};
+        if (content) sendOptions.content = content;
+        if (hasEmbed) sendOptions.embeds = [embed];
+
+        await channel.send(sendOptions);
+        sent++;
+      } catch {
+        failed++;
+      }
+    }
+
+    ann.totalSent = sent;
+    ann.totalFailed = failed;
+    await ann.save();
+
+    res.json({ sent, failed, total: guilds.size });
+  } catch (err) {
+    console.error('Error sending announcement:', err);
+    res.status(500).json({ error: `Failed to send announcement: ${err.message}` });
+  }
+});
+
 app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard', 'public', 'dashboard.html'));
 });

@@ -1088,78 +1088,8 @@ body {
   font-size: 0.8rem;
 }
 
-.status-buttons-section {
-  margin-top: 0.5rem;
-}
-
-.status-buttons-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.5rem;
-}
-
-.status-buttons-header span {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.status-buttons-header button {
-  background: none;
-  border: 1px solid var(--border);
-  color: var(--accent-light);
-  font-size: 0.75rem;
-  padding: 0.2rem 0.6rem;
-  border-radius: 6px;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.2s;
-}
-
-.status-buttons-header button:hover {
-  background: rgba(124, 58, 237, 0.1);
-  border-color: var(--accent);
-}
-
-.status-button-item {
-  display: flex;
-  gap: 0.5rem;
-  align-items: end;
-  margin-bottom: 0.5rem;
-}
-
-.status-button-item .form-group {
-  flex: 1;
-  margin-top: 0;
-}
-
-.status-button-item .form-group:first-child {
-  flex: 0.6;
-}
-
-.status-button-remove {
-  background: none;
-  border: none;
-  color: var(--red);
-  font-size: 1rem;
-  cursor: pointer;
-  padding: 0.5rem 0.25rem;
-  opacity: 0.6;
-  transition: opacity 0.2s;
-  flex-shrink: 0;
-}
-
-.status-button-remove:hover {
-  opacity: 1;
-}
-
 @media (max-width: 768px) {
-  .status-button-item {
-    flex-direction: column;
-  }
-
-  .status-button-item .form-group {
-    width: 100%;
+  .status-entry-card {
+    padding: 1rem;
   }
 }

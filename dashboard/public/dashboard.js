@@ -15,11 +15,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   userGuilds = user.guilds || [];
   renderServerList(userGuilds);
 
-  if (user.id !== '1394914695600934932') {
-    const statusNav = document.querySelector('.nav-item[data-panel="botstatus"]');
-    if (statusNav) statusNav.style.display = 'none';
-  }
-
   document.getElementById('serverSelectBtn').addEventListener('click', toggleDropdown);
   document.getElementById('serverSearch').addEventListener('input', filterServers);
   document.getElementById('mobileMenuBtn').addEventListener('click', toggleMobileMenu);
@@ -28,6 +23,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (user.id !== '1394914695600934932') {
     const statusNav = document.querySelector('.nav-item[data-panel="botstatus"]');
     if (statusNav) statusNav.style.display = 'none';
+    const annNav = document.querySelector('.nav-item[data-panel="announcement"]');
+    if (annNav) annNav.style.display = 'none';
   }
 
   document.querySelectorAll('.nav-item').forEach(item => {
@@ -473,6 +470,7 @@ function switchPanel(panelName) {
     protection: 'Protection',
     serverlogs: 'Server Logs',
     autoroles: 'Auto Roles',
+    announcement: 'Global Announcement',
     botstatus: 'Bot Status',
     buttonroles: 'Button Roles',
   };
@@ -481,6 +479,9 @@ function switchPanel(panelName) {
 
   if (panelName === 'botstatus') {
     loadBotStatus();
+  }
+  if (panelName === 'announcement') {
+    loadAnnouncement();
   }
 }
 
@@ -692,7 +693,6 @@ function addStatusEntry() {
     type: 'PLAYING',
     state: '',
     url: '',
-    buttons: [],
   };
   statusEntries.push(entry);
   renderStatusEntries();
@@ -701,20 +701,6 @@ function addStatusEntry() {
 function removeStatusEntry(id) {
   statusEntries = statusEntries.filter(e => e.id !== id);
   statusEntries.forEach((e, i) => e.order = i);
-  renderStatusEntries();
-}
-
-function addEntryButton(entryId) {
-  const entry = statusEntries.find(e => e.id === entryId);
-  if (!entry) return;
-  entry.buttons.push({ label: '', url: '' });
-  renderStatusEntries();
-}
-
-function removeEntryButton(entryId, btnIndex) {
-  const entry = statusEntries.find(e => e.id === entryId);
-  if (!entry) return;
-  entry.buttons.splice(btnIndex, 1);
   renderStatusEntries();
 }
 
@@ -751,25 +737,6 @@ function renderStatusEntries() {
           <label class="form-label">Stream URL</label>
           <input type="text" class="form-input" value="${escapeAttr(entry.url)}" placeholder="https://twitch.tv/yourchannel" oninput="statusEntries.find(e=>e.id===${entry.id}).url=this.value">
         </div>` : ''}
-        <div class="status-buttons-section">
-          <div class="status-buttons-header">
-            <span>Buttons (${entry.buttons.length}/5)</span>
-            ${entry.buttons.length < 5 ? `<button onclick="addEntryButton(${entry.id})">+ Add Button</button>` : ''}
-          </div>
-          ${entry.buttons.map((btn, bi) => `
-          <div class="status-button-item">
-            <div class="form-group">
-              <label class="form-label">Label</label>
-              <input type="text" class="form-input" value="${escapeAttr(btn.label)}" placeholder="Button text" oninput="statusEntries[${index}].buttons[${bi}].label=this.value">
-            </div>
-            <div class="form-group">
-              <label class="form-label">URL</label>
-              <input type="text" class="form-input" value="${escapeAttr(btn.url)}" placeholder="https://..." oninput="statusEntries[${index}].buttons[${bi}].url=this.value">
-            </div>
-            <button class="status-button-remove" onclick="removeEntryButton(${entry.id}, ${bi})">&times;</button>
-          </div>
-          `).join('')}
-        </div>
       </div>
     </div>`;
   });
@@ -808,7 +775,6 @@ async function loadBotStatus() {
           type: entry.type || 'PLAYING',
           state: entry.state || '',
           url: entry.url || '',
-          buttons: entry.buttons ? entry.buttons.map(b => ({ label: b.label || '', url: b.url || '' })) : [],
         });
       });
     }
@@ -818,13 +784,99 @@ async function loadBotStatus() {
   }
 }
 
+async function loadAnnouncement() {
+  try {
+    const res = await fetch('/api/announcement');
+    if (!res.ok) return;
+    const data = await res.json();
+    document.getElementById('ann-content').value = data.content || '';
+    document.getElementById('ann-title').value = data.embedTitle || '';
+    document.getElementById('ann-desc').value = data.embedDescription || '';
+    document.getElementById('ann-color').value = data.embedColor || '#7c3aed';
+    document.getElementById('ann-footer').value = data.embedFooter || '';
+    document.getElementById('ann-image').value = data.embedImage || '';
+    document.getElementById('ann-thumbnail').value = data.embedThumbnail || '';
+    document.getElementById('ann-channel').value = data.channelId || '';
+
+    if (data.totalSent || data.totalFailed) {
+      document.getElementById('ann-stats').style.display = 'block';
+      document.getElementById('ann-sent').textContent = data.totalSent;
+      document.getElementById('ann-failed').textContent = data.totalFailed;
+      document.getElementById('ann-total').textContent = data.totalSent + data.totalFailed;
+    }
+  } catch (err) {
+    console.error('Failed to load announcement:', err);
+  }
+}
+
+async function saveAnnouncement() {
+  const payload = {
+    content: document.getElementById('ann-content').value,
+    embedTitle: document.getElementById('ann-title').value,
+    embedDescription: document.getElementById('ann-desc').value,
+    embedColor: document.getElementById('ann-color').value,
+    embedFooter: document.getElementById('ann-footer').value,
+    embedImage: document.getElementById('ann-image').value,
+    embedThumbnail: document.getElementById('ann-thumbnail').value,
+    channelId: document.getElementById('ann-channel').value,
+  };
+
+  try {
+    const res = await fetch('/api/announcement', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    showToast('Announcement draft saved!', 'success');
+  } catch (err) {
+    showToast(`Failed to save: ${err.message}`, 'error');
+  }
+}
+
+async function sendAnnouncement() {
+  const payload = {
+    content: document.getElementById('ann-content').value,
+    embedTitle: document.getElementById('ann-title').value,
+    embedDescription: document.getElementById('ann-desc').value,
+    embedColor: document.getElementById('ann-color').value,
+    embedFooter: document.getElementById('ann-footer').value,
+    embedImage: document.getElementById('ann-image').value,
+    embedThumbnail: document.getElementById('ann-thumbnail').value,
+    channelId: document.getElementById('ann-channel').value,
+  };
+
+  if (!payload.content && !payload.embedTitle && !payload.embedDescription) {
+    return showToast('Add a message or embed content before sending', 'error');
+  }
+
+  showToast('Sending announcement...', 'success');
+
+  try {
+    const res = await fetch('/api/announcement/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+
+    document.getElementById('ann-stats').style.display = 'block';
+    document.getElementById('ann-sent').textContent = data.sent;
+    document.getElementById('ann-failed').textContent = data.failed;
+    document.getElementById('ann-total').textContent = data.total;
+
+    showToast(`Sent to ${data.sent} servers (${data.failed} failed)`, data.failed === 0 ? 'success' : 'error');
+  } catch (err) {
+    showToast(`Failed to send: ${err.message}`, 'error');
+  }
+}
 async function saveBotStatus() {
   const entries = statusEntries.map((entry, i) => ({
     order: i,
     type: entry.type,
     state: entry.state,
     url: entry.url,
-    buttons: entry.buttons.filter(b => b.label && b.url),
   }));
 
   const payload = {

@@ -40,16 +40,10 @@ function applyPresence(client, entry) {
     activity.url = entry.url;
   }
 
-  const presenceData = {
+  client.user.setPresence({
     activities: [activity],
     status: 'online',
-  };
-
-  if (entry.buttons && entry.buttons.length > 0) {
-    presenceData.buttons = entry.buttons.map(b => ({ label: b.label, url: b.url }));
-  }
-
-  client.user.setPresence(presenceData);
+  });
 }
 
 function startRotation(client, entries, intervalMs) {
