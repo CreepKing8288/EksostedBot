@@ -15,9 +15,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   userGuilds = user.guilds || [];
   renderServerList(userGuilds);
 
+  if (user.id !== '1394914695600934932') {
+    const statusNav = document.querySelector('.nav-item[data-panel="botstatus"]');
+    if (statusNav) statusNav.style.display = 'none';
+  }
+
   document.getElementById('serverSelectBtn').addEventListener('click', toggleDropdown);
   document.getElementById('serverSearch').addEventListener('input', filterServers);
   document.getElementById('mobileMenuBtn').addEventListener('click', toggleMobileMenu);
+  document.getElementById('sidebarOverlay').addEventListener('click', closeMobileMenu);
+
+  const statusTypeEl = document.getElementById('status-type');
+  if (statusTypeEl) {
+    statusTypeEl.addEventListener('change', () => {
+      document.getElementById('status-url-group').style.display =
+        statusTypeEl.value === 'STREAMING' ? 'block' : 'none';
+    });
+  }
 
   document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', (e) => {
@@ -116,7 +130,8 @@ async function selectServer(guildId, guildName) {
 
   await loadConfigs();
   await loadLeaderboard('level', 1);
-  switchPanel('overview');
+    switchPanel('overview');
+  loadBotStatus();
 }
 
 async function loadConfigs() {
@@ -462,6 +477,7 @@ function switchPanel(panelName) {
     protection: 'Protection',
     serverlogs: 'Server Logs',
     autoroles: 'Auto Roles',
+    botstatus: 'Bot Status',
     buttonroles: 'Button Roles',
   };
 
@@ -469,11 +485,18 @@ function switchPanel(panelName) {
 }
 
 function toggleMobileMenu() {
-  document.getElementById('sidebar').classList.toggle('open');
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  const isOpen = sidebar.classList.contains('open');
+  sidebar.classList.toggle('open');
+  overlay.classList.toggle('open', !isOpen);
+  document.body.style.overflow = isOpen ? '' : 'hidden';
 }
 
 function closeMobileMenu() {
   document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('open');
+  document.body.style.overflow = '';
 }
 
 function showToast(message, type = 'success') {
@@ -655,6 +678,66 @@ async function loadLeaderboard(type, page) {
   } catch (err) {
     console.error('Leaderboard error:', err);
     container.innerHTML = '<p class="lb-empty">Failed to load leaderboard.</p>';
+  }
+}
+
+async function loadBotStatus() {
+  try {
+    const res = await fetch('/api/status');
+    if (!res.ok) {
+      if (res.status === 403) {
+        document.getElementById('status-enabled').disabled = true;
+        document.getElementById('status-type').disabled = true;
+        document.getElementById('status-interval').disabled = true;
+        document.getElementById('status-state').disabled = true;
+        document.getElementById('status-url').disabled = true;
+        return;
+      }
+      return;
+    }
+    const data = await res.json();
+    document.getElementById('status-enabled').checked = data.enabled !== false;
+    document.getElementById('status-type').value = data.type || 'PLAYING';
+    document.getElementById('status-state').value = data.state || '';
+    document.getElementById('status-url').value = data.url || '';
+    document.getElementById('status-interval').value = (data.interval || 30000) / 1000;
+    document.getElementById('status-url-group').style.display =
+      data.type === 'STREAMING' ? 'block' : 'none';
+  } catch (err) {
+    console.error('Failed to load bot status:', err);
+  }
+}
+
+async function saveBotStatus() {
+  const payload = {
+    enabled: document.getElementById('status-enabled').checked,
+    type: document.getElementById('status-type').value,
+    state: document.getElementById('status-state').value,
+    url: document.getElementById('status-url').value,
+    interval: parseInt(document.getElementById('status-interval').value) * 1000,
+  };
+
+  if (payload.type === 'STREAMING' && !payload.url) {
+    return showToast('Stream URL is required for Streaming type', 'error');
+  }
+
+  try {
+    const res = await fetch('/api/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText);
+    }
+
+    showToast('Bot status updated successfully!', 'success');
+    await loadBotStatus();
+  } catch (err) {
+    console.error('Save error:', err);
+    showToast(`Failed to save: ${err.message}`, 'error');
   }
 }
 

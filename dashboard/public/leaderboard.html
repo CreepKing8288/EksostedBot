@@ -94,6 +94,53 @@
 
     .nav-cta { display: flex; gap: 0.75rem; }
 
+    .mobile-menu-btn {
+      display: none;
+      background: none;
+      border: none;
+      color: var(--text-primary);
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 0.5rem;
+    }
+
+    .mobile-menu {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(10, 10, 15, 0.95);
+      backdrop-filter: blur(20px);
+      z-index: 99;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2rem;
+    }
+
+    .mobile-menu.open {
+      display: flex;
+    }
+
+    .mobile-menu a {
+      color: var(--text-primary);
+      text-decoration: none;
+      font-size: 1.5rem;
+      font-weight: 600;
+      transition: color 0.2s;
+    }
+
+    .mobile-menu a:hover {
+      color: var(--accent-light);
+    }
+
+    .mobile-menu .btn {
+      font-size: 1.1rem;
+      padding: 0.8rem 2rem;
+    }
+
     .btn {
       display: inline-flex;
       align-items: center;
@@ -339,12 +386,16 @@
     }
 
     @media (max-width: 768px) {
-      .nav-links { display: none; }
+      .nav-links, .nav-cta { display: none; }
+      .mobile-menu-btn { display: block; }
+      nav { padding: 1rem 1.5rem; }
+      .lb-page { padding: 5rem 1.5rem 3rem; }
       .lb-controls { flex-direction: column; }
       .lb-server-select, .lb-type-select { width: 100%; min-width: unset; }
       .lb-table { font-size: 0.8rem; }
       .lb-table thead th { font-size: 0.7rem; padding: 0.5rem; }
       .lb-table tbody td { padding: 0.5rem; }
+      .lb-header h1 { font-size: 1.5rem; }
     }
   </style>
 </head>
@@ -362,7 +413,17 @@
       <a href="/dashboard" class="btn btn-secondary">Dashboard</a>
       <a href="/auth/login?return=/leaderboard" class="btn btn-secondary" id="loginBtn">Login</a>
     </div>
+    <button class="mobile-menu-btn" id="mobileMenuBtn">&#9776;</button>
   </nav>
+
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="/" onclick="closeMobileMenu()">Home</a>
+    <a href="/leaderboard" onclick="closeMobileMenu()" style="color: var(--accent-light);">Leaderboard</a>
+    <a href="/dashboard" onclick="closeMobileMenu()">Dashboard</a>
+    <a href="http://discord.gg/7hZNYZbPbw" class="btn btn-secondary">Support</a>
+    <a href="https://discord.com/oauth2/authorize?client_id=1488409951956369510&permissions=8&integration_type=0&scope=bot" class="btn btn-primary">Invite Bot</a>
+    <a href="/auth/login?return=/leaderboard" class="btn btn-secondary" id="mobileLoginBtn">Login</a>
+  </div>
 
   <div class="lb-page">
     <div class="lb-header">
@@ -391,6 +452,25 @@
   </footer>
 
   <script>
+    // MOBILE MENU
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const mobileMenu = document.getElementById('mobileMenu');
+    let menuOpen = false;
+
+    mobileMenuBtn.addEventListener('click', () => {
+      menuOpen = !menuOpen;
+      mobileMenu.classList.toggle('open', menuOpen);
+      mobileMenuBtn.innerHTML = menuOpen ? '&#10005;' : '&#9776;';
+      document.body.style.overflow = menuOpen ? 'hidden' : '';
+    });
+
+    function closeMobileMenu() {
+      menuOpen = false;
+      mobileMenu.classList.remove('open');
+      mobileMenuBtn.innerHTML = '&#9776;';
+      document.body.style.overflow = '';
+    }
+
     let currentGuildId = null;
     let currentType = 'level';
     let currentPage = 1;

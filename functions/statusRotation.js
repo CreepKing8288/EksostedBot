@@ -2,74 +2,104 @@ const { ActivityType } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 
-function updateStatus(client) {
+let activeInterval = null;
+let currentConfig = null;
+
+function getStatusConfig() {
   try {
-    // Load status configuration from status.json in root directory
     const statusConfigPath = path.join(process.cwd(), 'status.json');
-    const statusConfig = JSON.parse(fs.readFileSync(statusConfigPath, 'utf8'));
-
-    const status = statusConfig.status;
-    const interval = statusConfig.interval;
-
-    // Function to update the bot's status
-    const updatePresence = () => {
-      // Get the correct ActivityType value directly from the enum
-      // ActivityType.Streaming instead of ActivityType['STREAMING']
-      let activityType;
-      switch (status.type.toUpperCase()) {
-        case 'PLAYING':
-          activityType = ActivityType.Playing;
-          break;
-        case 'STREAMING':
-          activityType = ActivityType.Streaming;
-          break;
-        case 'LISTENING':
-          activityType = ActivityType.Listening;
-          break;
-        case 'WATCHING':
-          activityType = ActivityType.Watching;
-          break;
-        case 'COMPETING':
-          activityType = ActivityType.Competing;
-          break;
-        default:
-          activityType = ActivityType.Playing;
-      }
-
-      // Replace variables in status text
-      let state = status.state
-        .replace('{serverCount}', client.guilds.cache.size)
-        .replace(
-          '{userCount}',
-          client.guilds.cache.reduce((acc, guild) => acc + guild.memberCount, 0)
-        );
-
-      // Create activity object
-      const activity = {
-        name: state,
-        type: activityType,
-      };
-
-      // Add URL for streaming status
-      if (status.type.toUpperCase() === 'STREAMING') {
-        activity.url = status.url;
-      }
-
-      // Set the presence
-      client.user.setPresence({
-        activities: [activity],
-        status: 'online',
-      });
+    return JSON.parse(fs.readFileSync(statusConfigPath, 'utf8'));
+  } catch {
+    return {
+      interval: 30000,
+      status: { type: 'PLAYING', state: '{userCount} people.', url: 'https://twitch.tv/lanya' },
     };
-
-    // Set initial status
-    updatePresence();
-
-    // Update status regularly to refresh the counts
-    setInterval(updatePresence, interval);
-  } catch (error) {
-    console.error(`Error with status configuration: ${error.message}`);
   }
 }
 
+function getActivityType(typeStr) {
+  switch ((typeStr || 'PLAYING').toUpperCase()) {
+    case 'PLAYING': return ActivityType.Playing;
+    case 'STREAMING': return ActivityType.Streaming;
+    case 'LISTENING': return ActivityType.Listening;
+    case 'WATCHING': return ActivityType.Watching;
+    case 'COMPETING': return ActivityType.Competing;
+    default: return ActivityType.Playing;
+  }
+}
+
+function applyPresence(client, config) {
+  if (!client || !client.user) return;
+  const activityType = getActivityType(config.type);
+  let state = config.state
+    .replace('{serverCount}', client.guilds.cache.size)
+    .replace('{userCount}', client.guilds.cache.reduce((acc, g) => acc + g.memberCount, 0));
+
+  const activity = { name: state, type: activityType };
+  if (config.type && config.type.toUpperCase() === 'STREAMING' && config.url) {
+    activity.url = config.url;
+  }
+
+  client.user.setPresence({
+    activities: [activity],
+    status: config.enabled !== false ? 'online' : 'idle',
+  });
+}
+
+function startRotation(client, config) {
+  if (activeInterval) {
+    clearInterval(activeInterval);
+    activeInterval = null;
+  }
+  if (!config || config.enabled === false) return;
+
+  applyPresence(client, config);
+  activeInterval = setInterval(() => applyPresence(client, config), config.interval || 30000);
+}
+
+async function updateBotStatus(client) {
+  try {
+    const BotStatus = require('../models/BotStatus');
+    const dbStatus = await BotStatus.findById('global');
+
+    if (dbStatus && dbStatus.enabled) {
+      currentConfig = {
+        type: dbStatus.type,
+        state: dbStatus.state,
+        url: dbStatus.url,
+        enabled: dbStatus.enabled,
+        interval: dbStatus.interval,
+      };
+      startRotation(client, currentConfig);
+    } else {
+      const fallback = getStatusConfig();
+      currentConfig = {
+        type: fallback.status.type,
+        state: fallback.status.state,
+        url: fallback.status.url,
+        enabled: true,
+        interval: fallback.interval,
+      };
+      startRotation(client, currentConfig);
+    }
+  } catch {
+    const fallback = getStatusConfig();
+    currentConfig = {
+      type: fallback.status.type,
+      state: fallback.status.state,
+      url: fallback.status.url,
+      enabled: true,
+      interval: fallback.interval,
+    };
+    startRotation(client, currentConfig);
+  }
+}
+
+// Legacy export for backward compatibility
+function updateStatus(client) {
+  updateBotStatus(client);
+}
+
 module.exports = updateStatus;
+module.exports.updateBotStatus = updateBotStatus;
+module.exports.applyPresence = applyPresence;

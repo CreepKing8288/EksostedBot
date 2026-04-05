@@ -27,6 +27,14 @@ const requireAuth = (req, res, next) => {
   next();
 };
 
+const OWNER_ID = '1394914695600934932';
+
+const requireOwner = (req, res, next) => {
+  if (!req.session.user) return res.status(401).json({ error: 'Not authenticated' });
+  if (req.session.user.id !== OWNER_ID) return res.status(403).json({ error: 'Owner only' });
+  next();
+};
+
 app.get('/auth/login', (req, res) => {
   const returnUrl = req.query.return || '/dashboard';
   const state = Buffer.from(JSON.stringify({ return: returnUrl })).toString('base64');
@@ -358,6 +366,73 @@ app.get('/api/guild/:guildId/leaderboard', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Error fetching leaderboard:', err);
     res.status(500).json({ error: 'Failed to fetch leaderboard' });
+  }
+});
+
+// Bot Status API - owner only
+app.get('/api/status', requireOwner, async (req, res) => {
+  try {
+    const BotStatus = require('./models/BotStatus');
+    let status = await BotStatus.findById('global');
+    if (!status) {
+      status = new BotStatus();
+      await status.save();
+    }
+    res.json(status);
+  } catch (err) {
+    console.error('Error fetching status:', err);
+    res.status(500).json({ error: 'Failed to fetch status' });
+  }
+});
+
+app.post('/api/status', requireOwner, async (req, res) => {
+  try {
+    const BotStatus = require('./models/BotStatus');
+    const { type, state, url, enabled, interval } = req.body;
+    let status = await BotStatus.findById('global');
+    if (!status) {
+      status = new BotStatus();
+    }
+    if (type) status.type = type;
+    if (state !== undefined) status.state = state;
+    if (url !== undefined) status.url = url;
+    if (enabled !== undefined) status.enabled = enabled;
+    if (interval) status.interval = interval;
+    status.updatedBy = req.session.user.id;
+    await status.save();
+
+    // Apply status immediately if client is available
+    if (client && client.user) {
+      try {
+        const { updateBotStatus } = require('./functions/statusRotation');
+        updateBotStatus(client);
+      } catch {}
+    }
+
+    res.json(status);
+  } catch (err) {
+    console.error('Error saving status:', err);
+    res.status(500).json({ error: 'Failed to save status' });
+  }
+});
+
+app.get('/api/status/public', async (req, res) => {
+  try {
+    const BotStatus = require('./models/BotStatus');
+    const status = await BotStatus.findById('global');
+    if (!status) {
+      return res.json({ enabled: true, type: 'PLAYING', state: '{userCount} people.' });
+    }
+    res.json({
+      enabled: status.enabled,
+      type: status.type,
+      state: status.state,
+      updatedAt: status.updatedAt,
+      updatedBy: status.updatedBy,
+    });
+  } catch (err) {
+    console.error('Error fetching public status:', err);
+    res.status(500).json({ error: 'Failed to fetch status' });
   }
 });
 

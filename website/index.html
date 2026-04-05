@@ -102,6 +102,69 @@
       gap: 0.75rem;
     }
 
+    .mobile-menu-btn {
+      display: none;
+      background: none;
+      border: none;
+      color: var(--text-primary);
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 0.5rem;
+      z-index: 101;
+    }
+
+    .mobile-menu {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(10, 10, 15, 0.95);
+      backdrop-filter: blur(20px);
+      z-index: 99;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2rem;
+    }
+
+    .mobile-menu.open {
+      display: flex;
+    }
+
+    .mobile-menu a {
+      color: var(--text-primary);
+      text-decoration: none;
+      font-size: 1.5rem;
+      font-weight: 600;
+      transition: color 0.2s;
+    }
+
+    .mobile-menu a:hover {
+      color: var(--accent-light);
+    }
+
+    .mobile-menu .btn {
+      font-size: 1.1rem;
+      padding: 0.8rem 2rem;
+    }
+
+    .mobile-menu .mobile-menu-links {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .mobile-menu .mobile-menu-cta {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
     .btn {
       display: inline-flex;
       align-items: center;
@@ -474,7 +537,7 @@
     }
 
     @media (max-width: 768px) {
-      .nav-links {
+      .nav-links, .nav-cta {
         display: none;
       }
 
@@ -482,8 +545,25 @@
         display: block;
       }
 
+      nav {
+        justify-content: space-between;
+        padding: 1rem 1.5rem;
+      }
+
+      .hero {
+        padding: 6rem 1.5rem 3rem;
+        min-height: auto;
+      }
+
+      .hero::before {
+        width: 300px;
+        height: 300px;
+      }
+
       .hero-stats {
         gap: 1.5rem;
+        flex-wrap: wrap;
+        justify-content: center;
       }
 
       .features-grid {
@@ -493,6 +573,13 @@
       .hero-buttons {
         flex-direction: column;
         align-items: center;
+        width: 100%;
+        max-width: 300px;
+      }
+
+      .hero-buttons .btn {
+        width: 100%;
+        justify-content: center;
       }
 
       .commands-section {
@@ -504,6 +591,23 @@
         flex-direction: column;
         align-items: flex-start;
         gap: 0.5rem;
+      }
+
+      .commands-tabs {
+        gap: 0.4rem;
+      }
+
+      .tab-btn {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.8rem;
+      }
+
+      section {
+        padding: 4rem 1.5rem;
+      }
+
+      .section-header {
+        margin-bottom: 2.5rem;
       }
     }
 
@@ -535,13 +639,27 @@
       <a href="/dashboard" class="btn btn-secondary">Dashboard</a>
       <a href="https://discord.com/oauth2/authorize?client_id=1488409951956369510&permissions=8&integration_type=0&scope=bot" class="btn btn-primary">Invite Bot</a>
     </div>
+    <button class="mobile-menu-btn" id="mobileMenuBtn">&#9776;</button>
   </nav>
+
+  <div class="mobile-menu" id="mobileMenu">
+    <div class="mobile-menu-links">
+      <a href="#features" onclick="closeMobileMenu()">Features</a>
+      <a href="#commands" onclick="closeMobileMenu()">Commands</a>
+      <a href="/leaderboard" onclick="closeMobileMenu()">Leaderboard</a>
+    </div>
+    <div class="mobile-menu-cta">
+      <a href="http://discord.gg/7hZNYZbPbw" class="btn btn-secondary">Support</a>
+      <a href="/dashboard" class="btn btn-secondary">Dashboard</a>
+      <a href="https://discord.com/oauth2/authorize?client_id=1488409951956369510&permissions=8&integration_type=0&scope=bot" class="btn btn-primary">Invite Bot</a>
+    </div>
+  </div>
 
   <!-- HERO -->
   <section class="hero">
     <div class="hero-badge">
       <span class="dot"></span>
-      Online & Ready
+      <span id="heroStatusText">Online & Ready</span>
     </div>
     <h1>
       The All-In-One<br>
@@ -800,6 +918,43 @@
   </footer>
 
   <script>
+    // MOBILE MENU
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const mobileMenu = document.getElementById('mobileMenu');
+    let menuOpen = false;
+
+    mobileMenuBtn.addEventListener('click', () => {
+      menuOpen = !menuOpen;
+      mobileMenu.classList.toggle('open', menuOpen);
+      mobileMenuBtn.innerHTML = menuOpen ? '&#10005;' : '&#9776;';
+      document.body.style.overflow = menuOpen ? 'hidden' : '';
+    });
+
+    function closeMobileMenu() {
+      menuOpen = false;
+      mobileMenu.classList.remove('open');
+      mobileMenuBtn.innerHTML = '&#9776;';
+      document.body.style.overflow = '';
+    }
+
+    // FETCH BOT STATUS
+    async function fetchBotStatus() {
+      try {
+        const res = await fetch('/api/status/public');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.state) {
+          const display = data.state
+            .replace(/\{userCount\}/g, '')
+            .replace(/\{serverCount\}/g, '');
+          if (display.trim()) {
+            document.getElementById('heroStatusText').textContent = display.trim();
+          }
+        }
+      } catch {}
+    }
+    fetchBotStatus();
+
     // TAB SWITCHING
     function showTab(name) {
       document.querySelectorAll('.commands-list').forEach(el => el.classList.remove('active'));
