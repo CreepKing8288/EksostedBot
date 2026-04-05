@@ -1122,7 +1122,7 @@ async function loadAnalytics() {
       topUsersEl.innerHTML = data.topUsers.map((u, i) => `
         <div class="analytics-user-row">
           <span class="analytics-user-rank">${i + 1}</span>
-          <span class="analytics-user-name">${escapeHtml(u.userId)}</span>
+          <span class="analytics-user-name">${escapeHtml(u.username || u.userId)}</span>
           <span class="analytics-user-stat">Lvl ${u.level}</span>
         </div>
       `).join('');
@@ -1138,7 +1138,7 @@ async function loadAnalytics() {
         return `
         <div class="analytics-user-row">
           <span class="analytics-user-rank">${i + 1}</span>
-          <span class="analytics-user-name">${escapeHtml(u.userId)}</span>
+          <span class="analytics-user-name">${escapeHtml(u.username || u.userId)}</span>
           <span class="analytics-user-stat">${hours}h ${mins}m</span>
         </div>`;
       }).join('');

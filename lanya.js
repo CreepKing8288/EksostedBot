@@ -706,6 +706,23 @@ app.get('/api/analytics/overview', requireAuth, async (req, res) => {
     const topUsers = await MemberData.find({ guildId }).sort({ totalXp: -1 }).limit(10).lean();
     const topVoice = await MemberData.find({ guildId }).sort({ voiceSeconds: -1 }).limit(10).lean();
 
+    const userIds = [...new Set([...topUsers.map(u => u.userId), ...topVoice.map(u => u.userId)])];
+    const userMap = {};
+    for (const uid of userIds) {
+      try {
+        const user = await client.users.fetch(uid).catch(() => null);
+        if (user) {
+          userMap[uid] = { username: user.username, avatar: user.avatar };
+        }
+      } catch {}
+    }
+
+    const enrichUsers = (list) => list.map(u => ({
+      ...u,
+      username: userMap[u.userId]?.username || `User ${u.userId}`,
+      avatar: userMap[u.userId]?.avatar || null,
+    }));
+
     res.json({
       guild: { name: guild.name, memberCount: guild.memberCount, icon: guild.icon },
       totalMembers,
@@ -714,8 +731,8 @@ app.get('/api/analytics/overview', requireAuth, async (req, res) => {
       totalVoiceHours: totalVoiceSeconds.length > 0 ? Math.round(totalVoiceSeconds[0].total / 3600) : 0,
       totalGiveaways,
       activeGiveaways,
-      topUsers,
-      topVoice,
+      topUsers: enrichUsers(topUsers),
+      topVoice: enrichUsers(topVoice),
     });
   } catch (err) {
     console.error('Error fetching analytics:', err);
