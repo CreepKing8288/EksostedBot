@@ -48,6 +48,7 @@ module.exports = {
 
     memberData.xp += xpToAdd;
     memberData.totalXp += xpToAdd;
+    memberData.messageCount = (memberData.messageCount || 0) + 1;
 
     await module.exports.processLevelUp(memberData, guildData, message);
 

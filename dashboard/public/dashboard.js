@@ -1098,6 +1098,10 @@ async function loadAnalytics() {
         <div><div class="stat-label">Active Chatters</div><div class="stat-value">${data.activeMembers}</div></div>
       </div>
       <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(245, 158, 11, 0.1); color: var(--yellow);">📝</div>
+        <div><div class="stat-label">Total Messages</div><div class="stat-value">${data.totalMessages}</div></div>
+      </div>
+      <div class="stat-card">
         <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1); color: var(--blue);">📊</div>
         <div><div class="stat-label">Average Level</div><div class="stat-value">${data.avgLevel}</div></div>
       </div>
@@ -1123,7 +1127,7 @@ async function loadAnalytics() {
         <div class="analytics-user-row">
           <span class="analytics-user-rank">${i + 1}</span>
           <span class="analytics-user-name">${escapeHtml(u.username || u.userId)}</span>
-          <span class="analytics-user-stat">Lvl ${u.level}</span>
+          <span class="analytics-user-stat">${u.messageCount || 0} messages</span>
         </div>
       `).join('');
     }

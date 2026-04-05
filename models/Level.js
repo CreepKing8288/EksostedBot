@@ -21,6 +21,7 @@ const memberDataSchema = new mongoose.Schema({
   totalXp: { type: Number, default: 0 },
   voiceXp: { type: Number, default: 0 },
   voiceSeconds: { type: Number, default: 0 },
+  messageCount: { type: Number, default: 0 },
   aboutMe: { type: String, default: 'No bio set.' },
   achievements: {
     type: [

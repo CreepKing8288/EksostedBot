@@ -703,7 +703,7 @@ app.get('/api/analytics/overview', requireAuth, async (req, res) => {
     const totalGiveaways = await Giveaway.countDocuments({ guildId });
     const activeGiveaways = await Giveaway.countDocuments({ guildId, ongoing: true });
 
-    const topUsers = await MemberData.find({ guildId }).sort({ totalXp: -1 }).limit(10).lean();
+    const topUsers = await MemberData.find({ guildId }).sort({ messageCount: -1 }).limit(10).lean();
     const topVoice = await MemberData.find({ guildId }).sort({ voiceSeconds: -1 }).limit(10).lean();
 
     const userIds = [...new Set([...topUsers.map(u => u.userId), ...topVoice.map(u => u.userId)])];
@@ -723,11 +723,14 @@ app.get('/api/analytics/overview', requireAuth, async (req, res) => {
       avatar: userMap[u.userId]?.avatar || null,
     }));
 
+    const totalMessages = await MemberData.aggregate([{ $match: { guildId } }, { $group: { _id: null, total: { $sum: '$messageCount' } } }]);
+
     res.json({
       guild: { name: guild.name, memberCount: guild.memberCount, icon: guild.icon },
       totalMembers,
       activeMembers,
       avgLevel: avgLevel.length > 0 ? Math.round(avgLevel[0].avg) : 0,
+      totalMessages: totalMessages.length > 0 ? totalMessages[0].total : 0,
       totalVoiceHours: totalVoiceSeconds.length > 0 ? Math.round(totalVoiceSeconds[0].total / 3600) : 0,
       totalGiveaways,
       activeGiveaways,
