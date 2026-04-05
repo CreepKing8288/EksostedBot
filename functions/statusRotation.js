@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 let activeInterval = null;
-let currentConfig = null;
+let currentIndex = 0;
 
 function getStatusConfig() {
   try {
@@ -28,33 +28,44 @@ function getActivityType(typeStr) {
   }
 }
 
-function applyPresence(client, config) {
-  if (!client || !client.user) return;
-  const activityType = getActivityType(config.type);
-  let state = config.state
+function applyPresence(client, entry) {
+  if (!client || !client.user || !entry) return;
+  const activityType = getActivityType(entry.type);
+  let state = entry.state
     .replace('{serverCount}', client.guilds.cache.size)
     .replace('{userCount}', client.guilds.cache.reduce((acc, g) => acc + g.memberCount, 0));
 
   const activity = { name: state, type: activityType };
-  if (config.type && config.type.toUpperCase() === 'STREAMING' && config.url) {
-    activity.url = config.url;
+  if (entry.type && entry.type.toUpperCase() === 'STREAMING' && entry.url) {
+    activity.url = entry.url;
   }
 
-  client.user.setPresence({
+  const presenceData = {
     activities: [activity],
-    status: config.enabled !== false ? 'online' : 'idle',
-  });
+    status: 'online',
+  };
+
+  if (entry.buttons && entry.buttons.length > 0) {
+    presenceData.buttons = entry.buttons.map(b => ({ label: b.label, url: b.url }));
+  }
+
+  client.user.setPresence(presenceData);
 }
 
-function startRotation(client, config) {
+function startRotation(client, entries, intervalMs) {
   if (activeInterval) {
     clearInterval(activeInterval);
     activeInterval = null;
   }
-  if (!config || config.enabled === false) return;
+  if (!entries || entries.length === 0) return;
 
-  applyPresence(client, config);
-  activeInterval = setInterval(() => applyPresence(client, config), config.interval || 30000);
+  currentIndex = 0;
+  applyPresence(client, entries[0]);
+
+  activeInterval = setInterval(() => {
+    currentIndex = (currentIndex + 1) % entries.length;
+    applyPresence(client, entries[currentIndex]);
+  }, intervalMs || 30000);
 }
 
 async function updateBotStatus(client) {
@@ -62,40 +73,31 @@ async function updateBotStatus(client) {
     const BotStatus = require('../models/BotStatus');
     const dbStatus = await BotStatus.findById('global');
 
-    if (dbStatus && dbStatus.enabled) {
-      currentConfig = {
-        type: dbStatus.type,
-        state: dbStatus.state,
-        url: dbStatus.url,
-        enabled: dbStatus.enabled,
-        interval: dbStatus.interval,
-      };
-      startRotation(client, currentConfig);
+    if (dbStatus && dbStatus.enabled && dbStatus.entries && dbStatus.entries.length > 0) {
+      const sorted = [...dbStatus.entries].sort((a, b) => a.order - b.order);
+      startRotation(client, sorted, dbStatus.interval);
     } else {
       const fallback = getStatusConfig();
-      currentConfig = {
+      const fallbackEntry = {
         type: fallback.status.type,
         state: fallback.status.state,
         url: fallback.status.url,
-        enabled: true,
-        interval: fallback.interval,
+        buttons: [],
       };
-      startRotation(client, currentConfig);
+      startRotation(client, [fallbackEntry], fallback.interval);
     }
   } catch {
     const fallback = getStatusConfig();
-    currentConfig = {
+    const fallbackEntry = {
       type: fallback.status.type,
       state: fallback.status.state,
       url: fallback.status.url,
-      enabled: true,
-      interval: fallback.interval,
+      buttons: [],
     };
-    startRotation(client, currentConfig);
+    startRotation(client, [fallbackEntry], fallback.interval);
   }
 }
 
-// Legacy export for backward compatibility
 function updateStatus(client) {
   updateBotStatus(client);
 }

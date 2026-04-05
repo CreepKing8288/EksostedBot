@@ -388,16 +388,14 @@ app.get('/api/status', requireOwner, async (req, res) => {
 app.post('/api/status', requireOwner, async (req, res) => {
   try {
     const BotStatus = require('./models/BotStatus');
-    const { type, state, url, enabled, interval } = req.body;
+    const { enabled, interval, entries } = req.body;
     let status = await BotStatus.findById('global');
     if (!status) {
       status = new BotStatus();
     }
-    if (type) status.type = type;
-    if (state !== undefined) status.state = state;
-    if (url !== undefined) status.url = url;
     if (enabled !== undefined) status.enabled = enabled;
     if (interval) status.interval = interval;
+    if (entries) status.entries = entries;
     status.updatedBy = req.session.user.id;
     await status.save();
 
@@ -420,13 +418,14 @@ app.get('/api/status/public', async (req, res) => {
   try {
     const BotStatus = require('./models/BotStatus');
     const status = await BotStatus.findById('global');
-    if (!status) {
-      return res.json({ enabled: true, type: 'PLAYING', state: '{userCount} people.' });
+    if (!status || !status.entries || status.entries.length === 0) {
+      return res.json({ enabled: true, current: '' });
     }
+    const first = status.entries[0];
     res.json({
       enabled: status.enabled,
-      type: status.type,
-      state: status.state,
+      type: first.type,
+      state: first.state,
       updatedAt: status.updatedAt,
       updatedBy: status.updatedBy,
     });

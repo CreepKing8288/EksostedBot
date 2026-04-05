@@ -83,30 +83,34 @@
           </a>
         </div>
 
-          <div class="nav-section">
-            <div class="nav-section-title">Settings</div>
-            <a href="#" class="nav-item" data-panel="welcome">
-              <span class="nav-icon">👋</span> Welcome
-            </a>
-            <a href="#" class="nav-item" data-panel="botstatus">
-              <span class="nav-icon">🟢</span> Bot Status
-            </a>
-            <a href="#" class="nav-item" data-panel="aichat">
-              <span class="nav-icon">🤖</span> AI Chat
-            </a>
-            <a href="#" class="nav-item" data-panel="protection">
-              <span class="nav-icon">🛡️</span> Protection
-            </a>
-            <a href="#" class="nav-item" data-panel="serverlogs">
-              <span class="nav-icon">📋</span> Server Logs
-            </a>
-            <a href="#" class="nav-item" data-panel="autoroles">
-              <span class="nav-icon">🏷️</span> Auto Roles
-            </a>
-            <a href="#" class="nav-item" data-panel="buttonroles">
-              <span class="nav-icon">🔘</span> Button Roles
-            </a>
-          </div>
+        <div class="nav-section">
+          <div class="nav-section-title">Bot Modification</div>
+          <a href="#" class="nav-item" data-panel="botstatus">
+            <span class="nav-icon">🟢</span> Bot Status
+          </a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Settings</div>
+          <a href="#" class="nav-item" data-panel="welcome">
+            <span class="nav-icon">👋</span> Welcome
+          </a>
+          <a href="#" class="nav-item" data-panel="aichat">
+            <span class="nav-icon">🤖</span> AI Chat
+          </a>
+          <a href="#" class="nav-item" data-panel="protection">
+            <span class="nav-icon">🛡️</span> Protection
+          </a>
+          <a href="#" class="nav-item" data-panel="serverlogs">
+            <span class="nav-icon">📋</span> Server Logs
+          </a>
+          <a href="#" class="nav-item" data-panel="autoroles">
+            <span class="nav-icon">🏷️</span> Auto Roles
+          </a>
+          <a href="#" class="nav-item" data-panel="buttonroles">
+            <span class="nav-icon">🔘</span> Button Roles
+          </a>
+        </div>
       </nav>
 
       <div class="sidebar-footer">
@@ -606,45 +610,34 @@
         <div class="panel" id="panel-botstatus">
           <div class="panel-header">
             <h2>Bot Status</h2>
-            <p>Configure the bot's presence. Only the owner can modify this.</p>
+            <p>Configure rotating rich presence entries. The bot cycles through each entry at the set interval.</p>
           </div>
-          <div class="card">
+
+          <div class="card" style="max-width: 900px;">
             <div class="toggle-row">
               <div>
                 <div class="toggle-label">Enable Status Rotation</div>
-                <div class="toggle-desc">Automatically update the bot's presence with live counts.</div>
+                <div class="toggle-desc">Automatically cycle through the entries below.</div>
               </div>
               <label class="toggle">
                 <input type="checkbox" id="status-enabled">
                 <span class="toggle-slider"></span>
               </label>
             </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label">Activity Type</label>
-                <select class="form-select" id="status-type">
-                  <option value="PLAYING">Playing</option>
-                  <option value="STREAMING">Streaming</option>
-                  <option value="LISTENING">Listening</option>
-                  <option value="WATCHING">Watching</option>
-                  <option value="COMPETING">Competing</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Update Interval (seconds)</label>
-                <input type="number" class="form-input" id="status-interval" min="5" max="300" value="30">
-              </div>
-            </div>
+
             <div class="form-group">
-              <label class="form-label">Status Text</label>
-              <input type="text" class="form-input" id="status-state" placeholder="e.g. {userCount} users across {serverCount} servers">
-              <small style="color: var(--text-muted); font-size: 0.75rem;">Variables: <code style="color: var(--accent-light);">{userCount}</code> total users, <code style="color: var(--accent-light);">{serverCount}</code> total servers</small>
+              <label class="form-label">Rotation Interval (seconds)</label>
+              <input type="number" class="form-input" id="status-interval" min="5" max="300" value="30" style="max-width: 150px;">
             </div>
-            <div class="form-group" id="status-url-group" style="display: none;">
-              <label class="form-label">Stream URL (required for Streaming type)</label>
-              <input type="text" class="form-input" id="status-url" placeholder="https://twitch.tv/yourchannel">
+
+            <div style="margin-top: 1.5rem; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between;">
+              <h3 style="font-size: 1rem; font-weight: 700;">Status Entries</h3>
+              <button class="btn btn-primary" style="margin-top: 0; padding: 0.4rem 1rem; font-size: 0.8rem;" onclick="addStatusEntry()">+ Add Entry</button>
             </div>
-            <button class="btn btn-primary" onclick="saveBotStatus()">Save Status</button>
+
+            <div id="status-entries-list"></div>
+
+            <button class="btn btn-primary" onclick="saveBotStatus()">Save All Changes</button>
           </div>
         </div>
 

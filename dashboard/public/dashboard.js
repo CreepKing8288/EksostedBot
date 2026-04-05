@@ -25,12 +25,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('mobileMenuBtn').addEventListener('click', toggleMobileMenu);
   document.getElementById('sidebarOverlay').addEventListener('click', closeMobileMenu);
 
-  const statusTypeEl = document.getElementById('status-type');
-  if (statusTypeEl) {
-    statusTypeEl.addEventListener('change', () => {
-      document.getElementById('status-url-group').style.display =
-        statusTypeEl.value === 'STREAMING' ? 'block' : 'none';
-    });
+  if (user.id !== '1394914695600934932') {
+    const statusNav = document.querySelector('.nav-item[data-panel="botstatus"]');
+    if (statusNav) statusNav.style.display = 'none';
   }
 
   document.querySelectorAll('.nav-item').forEach(item => {
@@ -130,8 +127,7 @@ async function selectServer(guildId, guildName) {
 
   await loadConfigs();
   await loadLeaderboard('level', 1);
-    switchPanel('overview');
-  loadBotStatus();
+  switchPanel('overview');
 }
 
 async function loadConfigs() {
@@ -482,6 +478,10 @@ function switchPanel(panelName) {
   };
 
   document.getElementById('topbarTitle').textContent = titles[panelName] || 'Dashboard';
+
+  if (panelName === 'botstatus') {
+    loadBotStatus();
+  }
 }
 
 function toggleMobileMenu() {
@@ -681,45 +681,157 @@ async function loadLeaderboard(type, page) {
   }
 }
 
+let statusEntries = [];
+let entryCounter = 0;
+
+function addStatusEntry() {
+  entryCounter++;
+  const entry = {
+    id: entryCounter,
+    order: statusEntries.length,
+    type: 'PLAYING',
+    state: '',
+    url: '',
+    buttons: [],
+  };
+  statusEntries.push(entry);
+  renderStatusEntries();
+}
+
+function removeStatusEntry(id) {
+  statusEntries = statusEntries.filter(e => e.id !== id);
+  statusEntries.forEach((e, i) => e.order = i);
+  renderStatusEntries();
+}
+
+function addEntryButton(entryId) {
+  const entry = statusEntries.find(e => e.id === entryId);
+  if (!entry) return;
+  entry.buttons.push({ label: '', url: '' });
+  renderStatusEntries();
+}
+
+function removeEntryButton(entryId, btnIndex) {
+  const entry = statusEntries.find(e => e.id === entryId);
+  if (!entry) return;
+  entry.buttons.splice(btnIndex, 1);
+  renderStatusEntries();
+}
+
+function renderStatusEntries() {
+  const container = document.getElementById('status-entries-list');
+  if (statusEntries.length === 0) {
+    container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem 0; font-size: 0.9rem;">No entries yet. Click "Add Entry" to create your first status.</p>';
+    return;
+  }
+
+  let html = '';
+  statusEntries.forEach((entry, index) => {
+    html += `
+    <div class="status-entry-card">
+      <div class="status-entry-header">
+        <div class="status-entry-order">${index + 1}</div>
+        <select class="status-entry-type" onchange="statusEntries.find(e=>e.id===${entry.id}).type=this.value">
+          <option value="PLAYING" ${entry.type === 'PLAYING' ? 'selected' : ''}>Playing</option>
+          <option value="STREAMING" ${entry.type === 'STREAMING' ? 'selected' : ''}>Streaming</option>
+          <option value="LISTENING" ${entry.type === 'LISTENING' ? 'selected' : ''}>Listening</option>
+          <option value="WATCHING" ${entry.type === 'WATCHING' ? 'selected' : ''}>Watching</option>
+          <option value="COMPETING" ${entry.type === 'COMPETING' ? 'selected' : ''}>Competing</option>
+        </select>
+        <button class="status-entry-remove" onclick="removeStatusEntry(${entry.id})" title="Remove">&times;</button>
+      </div>
+      <div class="status-entry-body">
+        <div class="form-group">
+          <label class="form-label">Status Text</label>
+          <input type="text" class="form-input" value="${escapeAttr(entry.state)}" placeholder="e.g. {userCount} people." oninput="statusEntries.find(e=>e.id===${entry.id}).state=this.value">
+          <small style="color: var(--text-muted); font-size: 0.7rem;">Variables: <code style="color: var(--accent-light);">{userCount}</code> <code style="color: var(--accent-light);">{serverCount}</code></small>
+        </div>
+        ${entry.type === 'STREAMING' ? `
+        <div class="form-group">
+          <label class="form-label">Stream URL</label>
+          <input type="text" class="form-input" value="${escapeAttr(entry.url)}" placeholder="https://twitch.tv/yourchannel" oninput="statusEntries.find(e=>e.id===${entry.id}).url=this.value">
+        </div>` : ''}
+        <div class="status-buttons-section">
+          <div class="status-buttons-header">
+            <span>Buttons (${entry.buttons.length}/5)</span>
+            ${entry.buttons.length < 5 ? `<button onclick="addEntryButton(${entry.id})">+ Add Button</button>` : ''}
+          </div>
+          ${entry.buttons.map((btn, bi) => `
+          <div class="status-button-item">
+            <div class="form-group">
+              <label class="form-label">Label</label>
+              <input type="text" class="form-input" value="${escapeAttr(btn.label)}" placeholder="Button text" oninput="statusEntries[${index}].buttons[${bi}].label=this.value">
+            </div>
+            <div class="form-group">
+              <label class="form-label">URL</label>
+              <input type="text" class="form-input" value="${escapeAttr(btn.url)}" placeholder="https://..." oninput="statusEntries[${index}].buttons[${bi}].url=this.value">
+            </div>
+            <button class="status-button-remove" onclick="removeEntryButton(${entry.id}, ${bi})">&times;</button>
+          </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>`;
+  });
+
+  container.innerHTML = html;
+}
+
+function escapeAttr(text) {
+  return (text || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 async function loadBotStatus() {
   try {
     const res = await fetch('/api/status');
     if (!res.ok) {
       if (res.status === 403) {
-        document.getElementById('status-enabled').disabled = true;
-        document.getElementById('status-type').disabled = true;
-        document.getElementById('status-interval').disabled = true;
-        document.getElementById('status-state').disabled = true;
-        document.getElementById('status-url').disabled = true;
+        const container = document.getElementById('status-entries-list');
+        if (container) container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem 0;">You do not have permission to modify the bot status.</p>';
         return;
       }
       return;
     }
     const data = await res.json();
     document.getElementById('status-enabled').checked = data.enabled !== false;
-    document.getElementById('status-type').value = data.type || 'PLAYING';
-    document.getElementById('status-state').value = data.state || '';
-    document.getElementById('status-url').value = data.url || '';
     document.getElementById('status-interval').value = (data.interval || 30000) / 1000;
-    document.getElementById('status-url-group').style.display =
-      data.type === 'STREAMING' ? 'block' : 'none';
+
+    statusEntries = [];
+    entryCounter = 0;
+    if (data.entries && data.entries.length > 0) {
+      const sorted = [...data.entries].sort((a, b) => a.order - b.order);
+      sorted.forEach((entry, i) => {
+        entryCounter++;
+        statusEntries.push({
+          id: entryCounter,
+          order: i,
+          type: entry.type || 'PLAYING',
+          state: entry.state || '',
+          url: entry.url || '',
+          buttons: entry.buttons ? entry.buttons.map(b => ({ label: b.label || '', url: b.url || '' })) : [],
+        });
+      });
+    }
+    renderStatusEntries();
   } catch (err) {
     console.error('Failed to load bot status:', err);
   }
 }
 
 async function saveBotStatus() {
+  const entries = statusEntries.map((entry, i) => ({
+    order: i,
+    type: entry.type,
+    state: entry.state,
+    url: entry.url,
+    buttons: entry.buttons.filter(b => b.label && b.url),
+  }));
+
   const payload = {
     enabled: document.getElementById('status-enabled').checked,
-    type: document.getElementById('status-type').value,
-    state: document.getElementById('status-state').value,
-    url: document.getElementById('status-url').value,
     interval: parseInt(document.getElementById('status-interval').value) * 1000,
+    entries,
   };
-
-  if (payload.type === 'STREAMING' && !payload.url) {
-    return showToast('Stream URL is required for Streaming type', 'error');
-  }
 
   try {
     const res = await fetch('/api/status', {
