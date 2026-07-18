@@ -19,7 +19,12 @@ module.exports = {
     if (typeof voiceStateUpdate.initialize === 'function') {
       await voiceStateUpdate.initialize(client);
     }
-    client.on('raw', (packet) => client.lavalink.sendRawData(packet));
+    client.on('raw', (packet) => {
+      client.lavalink.sendRawData(packet);
+      if (packet.t === 'MESSAGE_REACTION_ADD' || packet.t === 'MESSAGE_REACTION_REMOVE') {
+        console.log(`[Raw] ${packet.t}: emoji=${packet.d.emoji?.name} msg=${packet.d.message_id} user=${packet.d.user_id}`);
+      }
+    });
     const commandFolderPath = path.join(__dirname, '../../commands');
     const categories = fs
       .readdirSync(commandFolderPath)

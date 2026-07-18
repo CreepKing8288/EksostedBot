@@ -7,6 +7,7 @@ const StarboardSchema = new mongoose.Schema({
   emoji: { type: String, default: '⭐' },
   threshold: { type: Number, default: 3 },
   ignoredChannels: { type: [String], default: [] },
+  watchChannels: { type: [String], default: [] },
 });
 
 const StarboardPostSchema = new mongoose.Schema({

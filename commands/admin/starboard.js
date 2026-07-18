@@ -71,6 +71,27 @@ module.exports = {
     )
     .addSubcommand((subcommand) =>
       subcommand
+        .setName('watchchannel')
+        .setDescription('Add or remove a channel from the starboard watch list')
+        .addStringOption((option) =>
+          option
+            .setName('action')
+            .setDescription('Add or remove')
+            .setRequired(true)
+            .addChoices(
+              { name: 'add', value: 'add' },
+              { name: 'remove', value: 'remove' }
+            )
+        )
+        .addChannelOption((option) =>
+          option
+            .setName('channel')
+            .setDescription('Channel to watch/unwatch')
+            .setRequired(true)
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
         .setName('status')
         .setDescription('View starboard configuration')
     ),
@@ -156,6 +177,41 @@ module.exports = {
         }
       }
 
+      case 'watchchannel': {
+        const action = interaction.options.getString('action');
+        const channel = interaction.options.getChannel('channel');
+
+        const config = await Starboard.findOneAndUpdate(
+          { guildId: interaction.guild.id },
+          {},
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+
+        if (action === 'add') {
+          if (!config.watchChannels.includes(channel.id)) {
+            config.watchChannels.push(channel.id);
+            await config.save();
+          }
+
+          const embed = new EmbedBuilder()
+            .setTitle('Channel Watched')
+            .setDescription(`Only messages from <#${channel.id}> (and other watched channels) will appear on the starboard.`)
+            .setColor('Green');
+
+          return interaction.reply({ embeds: [embed], ephemeral: true });
+        } else {
+          config.watchChannels = config.watchChannels.filter(id => id !== channel.id);
+          await config.save();
+
+          const embed = new EmbedBuilder()
+            .setTitle('Channel Unwatched')
+            .setDescription(`<#${channel.id}> is no longer watched for the starboard.`)
+            .setColor('Green');
+
+          return interaction.reply({ embeds: [embed], ephemeral: true });
+        }
+      }
+
       case 'status': {
         const config = await Starboard.findOne({ guildId: interaction.guild.id });
 
@@ -195,6 +251,12 @@ module.exports = {
               value: config.ignoredChannels.length > 0
                 ? config.ignoredChannels.map(id => `<#${id}>`).join(', ')
                 : 'None',
+            },
+            {
+              name: 'Watched Channels',
+              value: config.watchChannels.length > 0
+                ? config.watchChannels.map(id => `<#${id}>`).join(', ')
+                : 'All channels',
             }
           );
 

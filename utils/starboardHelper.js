@@ -18,7 +18,8 @@ async function handleReaction(reaction, user, added) {
   if (!config) return console.log('[Starboard] Skipped: no config found for guild');
   if (!config.enabled) return console.log('[Starboard] Skipped: starboard disabled');
   if (!config.channelId) return console.log('[Starboard] Skipped: no channel set');
-  if (config.ignoredChannels.includes(message.channel.id)) return console.log('[Starboard] Skipped: channel ignored');
+  if (config.ignoredChannels?.includes(message.channel.id)) return console.log('[Starboard] Skipped: channel ignored');
+  if (config.watchChannels?.length > 0 && !config.watchChannels.includes(message.channel.id)) return console.log('[Starboard] Skipped: channel not in watch list');
   if (reaction.emoji.name !== config.emoji) return console.log(`[Starboard] Skipped: emoji mismatch (${reaction.emoji.name} !== ${config.emoji})`);
 
   const starboardChannel = message.guild.channels.cache.get(config.channelId);

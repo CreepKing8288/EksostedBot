@@ -35,13 +35,26 @@ module.exports = (client) => {
           loadEvents(filePath);
         }
       } else if (file.endsWith('.js')) {
-        const event = require(filePath);
-        if (event.once) {
-          client.once(event.name, (...args) => event.execute(...args));
-        } else {
-          client.on(event.name, (...args) => event.execute(...args));
+        try {
+          const event = require(filePath);
+          if (event && event.name && event.execute) {
+            if (event.once) {
+              client.once(event.name, (...args) => {
+                event.execute(...args).catch(err => console.error(`Event error [${event.name}]:`, err));
+              });
+            } else {
+              client.on(event.name, (...args) => {
+                event.execute(...args).catch(err => console.error(`Event error [${event.name}]:`, err));
+              });
+            }
+            if (file === 'starboard.js' || file === 'starboardRemove.js') {
+              console.log(`[Events] Registered: ${file} -> ${event.name}`);
+            }
+            count++;
+          }
+        } catch (err) {
+          console.error(`Failed to load event: ${file}`, err.message);
         }
-        count++;
       }
     });
   };

@@ -1074,7 +1074,7 @@ app.listen(DASHBOARD_PORT, () => {
   console.log(`✅ Dashboard running on http://localhost:${DASHBOARD_PORT}`);
 });
 const dotenv = require('dotenv');
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const { LavalinkManager } = require('lavalink-client');
 const fs = require('fs');
 const chalk = require('chalk');
@@ -1112,6 +1112,11 @@ const client = new Client({
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.GuildMessageReactions,
+  ],
+  partials: [
+    Partials.Message,
+    Partials.Channel,
+    Partials.Reaction,
   ],
 });
 client.activeCrateMessages = new Map();
