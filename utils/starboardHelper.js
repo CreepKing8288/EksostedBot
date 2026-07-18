@@ -3,26 +3,29 @@ const Starboard = require('../models/Starboard');
 const { StarboardPost } = require('../models/Starboard');
 
 async function handleReaction(reaction, user, added) {
-  if (user.bot) return;
+  if (user.bot) return console.log('[Starboard] Skipped: bot user');
   if (reaction.partial) {
-    try { await reaction.fetch(); } catch { return; }
+    try { await reaction.fetch(); } catch { return console.log('[Starboard] Skipped: failed to fetch reaction'); }
   }
   if (reaction.message.partial) {
-    try { await reaction.message.fetch(); } catch { return; }
+    try { await reaction.message.fetch(); } catch { return console.log('[Starboard] Skipped: failed to fetch message'); }
   }
 
   const message = reaction.message;
-  if (!message.guild) return;
+  if (!message.guild) return console.log('[Starboard] Skipped: not in a guild');
 
   const config = await Starboard.findOne({ guildId: message.guild.id });
-  if (!config || !config.enabled || !config.channelId) return;
-  if (config.ignoredChannels.includes(message.channel.id)) return;
-  if (reaction.emoji.name !== config.emoji) return;
+  if (!config) return console.log('[Starboard] Skipped: no config found for guild');
+  if (!config.enabled) return console.log('[Starboard] Skipped: starboard disabled');
+  if (!config.channelId) return console.log('[Starboard] Skipped: no channel set');
+  if (config.ignoredChannels.includes(message.channel.id)) return console.log('[Starboard] Skipped: channel ignored');
+  if (reaction.emoji.name !== config.emoji) return console.log(`[Starboard] Skipped: emoji mismatch (${reaction.emoji.name} !== ${config.emoji})`);
 
   const starboardChannel = message.guild.channels.cache.get(config.channelId);
-  if (!starboardChannel) return;
+  if (!starboardChannel) return console.log('[Starboard] Skipped: starboard channel not found in cache');
 
   const count = reaction.count;
+  console.log(`[Starboard] Processing: count=${count}, threshold=${config.threshold}, added=${added}`);
   const existingPost = await StarboardPost.findOne({ guildId: message.guild.id, originalMessageId: message.id });
 
   if (added) {
