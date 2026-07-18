@@ -2,6 +2,8 @@ const { EmbedBuilder } = require('discord.js');
 const axios = require('axios');
 const ServerStatus = require('../models/ServerStatus');
 
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 module.exports = async (client) => {
   const updateServerStatus = async () => {
     const servers = await ServerStatus.find();
