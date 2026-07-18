@@ -50,9 +50,17 @@ module.exports = {
       .setStyle(TextInputStyle.Short)
       .setRequired(false);
 
+    const reveal = new TextInputBuilder()
+      .setCustomId('reveal')
+      .setLabel('Reveal your identity? (yes/no)')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(false)
+      .setPlaceholder('no');
+
     modal.addComponents(
       new ActionRowBuilder().addComponents(content),
-      new ActionRowBuilder().addComponents(attachment)
+      new ActionRowBuilder().addComponents(attachment),
+      new ActionRowBuilder().addComponents(reveal)
     );
 
     return modal;
@@ -64,6 +72,8 @@ module.exports = {
 
     const content = interaction.fields.getTextInputValue('content');
     const attachment = interaction.fields.getTextInputValue('attachment');
+    const revealInput = interaction.fields.getTextInputValue('reveal') || '';
+    const isRevealed = ['yes', 'y', 'true', '1'].includes(revealInput.toLowerCase().trim());
 
     if (!client.db) {
       return interaction.followUp({
@@ -134,9 +144,13 @@ module.exports = {
     }
 
     const embed = new EmbedBuilder()
-      .setTitle(`Anonymous Confession (#${num})`)
+      .setTitle(isRevealed ? `Confession (#${num}) — Revealed` : `Anonymous Confession (#${num})`)
       .setDescription(`"${content}"`)
-      .setColor('Random');
+      .setColor(isRevealed ? 'Green' : 'Random');
+
+    if (isRevealed) {
+      embed.setAuthor({ name: interaction.user.tag, iconURL: interaction.user.displayAvatarURL() });
+    }
     
     if (attachment) embed.setImage(attachment);
 
@@ -152,6 +166,7 @@ module.exports = {
 
     const row = new ActionRowBuilder().addComponents(replyButton, confessButton);
     const confessionMessage = await confChannel.send({ embeds: [embed], components: [row] });
+
     await client.db.collection('settings').updateOne(
       { _id: 'config', guildId: interaction.guild.id },
       { $set: { last_confession_message_id: confessionMessage.id } },

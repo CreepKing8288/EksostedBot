@@ -58,10 +58,18 @@ module.exports = {
       .setStyle(TextInputStyle.Short)
       .setRequired(false);
 
+    const reveal = new TextInputBuilder()
+      .setCustomId('reveal')
+      .setLabel('Reveal your identity? (yes/no)')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(false)
+      .setPlaceholder('no');
+
     modal.addComponents(
       new ActionRowBuilder().addComponents(replyContent),
       new ActionRowBuilder().addComponents(confessionId),
-      new ActionRowBuilder().addComponents(attachment)
+      new ActionRowBuilder().addComponents(attachment),
+      new ActionRowBuilder().addComponents(reveal)
     );
 
     return modal;
@@ -74,6 +82,8 @@ module.exports = {
     const replyContent = interaction.fields.getTextInputValue('reply_content');
     const targetNum = interaction.fields.getTextInputValue('confession_id');
     const attachment = interaction.fields.getTextInputValue('attachment');
+    const revealInput = interaction.fields.getTextInputValue('reveal') || '';
+    const isRevealed = ['yes', 'y', 'true', '1'].includes(revealInput.toLowerCase().trim());
 
     if (!client.db) {
       return interaction.followUp({
@@ -133,9 +143,13 @@ module.exports = {
 
     // 5. Send Reply to Thread
     const replyEmbed = new EmbedBuilder()
-      .setTitle(`Anonymous Reply (#${replyId})`)
+      .setTitle(isRevealed ? `Reply (#${replyId}) — Revealed` : `Anonymous Reply (#${replyId})`)
       .setDescription(`"${replyContent}"`)
-      .setColor('Random');
+      .setColor(isRevealed ? 'Green' : 'Random');
+
+    if (isRevealed) {
+      replyEmbed.setAuthor({ name: interaction.user.tag, iconURL: interaction.user.displayAvatarURL() });
+    }
 
     if (attachment) {
       if (!isValidUrl(attachment)) {
