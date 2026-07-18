@@ -1,6 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
-const Starboard = require('../../models/Starboard');
-const { StarboardPost } = require('../../models/Starboard');
+const Starboard = require('../models/Starboard');
+const { StarboardPost } = require('../models/Starboard');
 
 async function handleReaction(reaction, user, added) {
   if (user.bot) return;
