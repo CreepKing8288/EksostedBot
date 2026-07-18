@@ -2,6 +2,7 @@ const express = require('express');
 const session = require('express-session');
 const path = require('path');
 const crypto = require('crypto');
+const { discordFetch, sleep } = require('./utils/discordFetch');
 const app = express();
 app.set('trust proxy', 1);
 
@@ -61,7 +62,7 @@ app.get('/auth/callback', async (req, res) => {
   }
 
   try {
-    const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
+    const tokenRes = await discordFetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -80,7 +81,9 @@ app.get('/auth/callback', async (req, res) => {
     }
     const tokens = await tokenRes.json();
 
-    const userRes = await fetch('https://discord.com/api/users/@me', {
+    await sleep(500);
+
+    const userRes = await discordFetch('https://discord.com/api/users/@me', {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
     if (!userRes.ok) {
@@ -89,7 +92,9 @@ app.get('/auth/callback', async (req, res) => {
     }
     const user = await userRes.json();
 
-    const guildsRes = await fetch('https://discord.com/api/users/@me/guilds', {
+    await sleep(500);
+
+    const guildsRes = await discordFetch('https://discord.com/api/users/@me/guilds', {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
     if (!guildsRes.ok) {
@@ -103,7 +108,9 @@ app.get('/auth/callback', async (req, res) => {
       return res.status(500).send('Invalid guilds response');
     }
 
-    const botGuildsRes = await fetch('https://discord.com/api/users/@me/guilds', {
+    await sleep(500);
+
+    const botGuildsRes = await discordFetch('https://discord.com/api/users/@me/guilds', {
       headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` },
     });
     const botGuilds = botGuildsRes.ok ? await botGuildsRes.json() : [];
@@ -151,7 +158,7 @@ app.get('/api/user/guilds', requireAuth, async (req, res) => {
         let after = null;
         while (true) {
           const url = `https://discord.com/api/users/@me/guilds?limit=200${after ? `&after=${after}` : ''}`;
-          const guildsRes = await fetch(url, {
+          const guildsRes = await discordFetch(url, {
             headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` }
           });
           if (!guildsRes.ok) break;
@@ -291,7 +298,7 @@ app.get('/api/guild/:guildId/leaderboard', requireAuth, async (req, res) => {
         let after = null;
         while (true) {
           const url = `https://discord.com/api/guilds/${guildId}/members?limit=1000${after ? `&after=${after}` : ''}`;
-          const membersRes = await fetch(url, {
+          const membersRes = await discordFetch(url, {
             headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` }
           });
           if (!membersRes.ok) break;
@@ -300,6 +307,7 @@ app.get('/api/guild/:guildId/leaderboard', requireAuth, async (req, res) => {
           members.forEach(m => guildMemberIds.add(m.user.id));
           if (members.length < 1000) break;
           after = members[members.length - 1].user.id;
+          await sleep(500);
         }
       } catch (e) {
         console.error('Failed to fetch guild members:', e);
@@ -321,24 +329,18 @@ app.get('/api/guild/:guildId/leaderboard', requireAuth, async (req, res) => {
     const userIds = paginated.map(m => m.userId);
     let userMap = {};
     if (userIds.length > 0 && DISCORD_BOT_TOKEN) {
-      const userPromises = userIds.map(async (uid) => {
+      for (const uid of userIds) {
         try {
-          const userRes = await fetch(`https://discord.com/api/users/${uid}`, {
+          const userRes = await discordFetch(`https://discord.com/api/users/${uid}`, {
             headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` }
           });
           if (userRes.ok) {
             const u = await userRes.json();
-            return { id: uid, username: u.username, avatar: u.avatar, discriminator: u.discriminator };
+            userMap[uid] = { id: uid, username: u.username, avatar: u.avatar, discriminator: u.discriminator };
           }
         } catch {}
-        return { id: uid };
-      });
-      const users = await Promise.allSettled(userPromises);
-      users.forEach(r => {
-        if (r.status === 'fulfilled' && r.value && r.value.username) {
-          userMap[r.value.id] = r.value;
-        }
-      });
+        await sleep(500);
+      }
     }
 
     const leaderboard = paginated.map((m, i) => {

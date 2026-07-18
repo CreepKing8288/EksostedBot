@@ -3,6 +3,7 @@ const session = require('express-session');
 const path = require('path');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
+const { discordFetch, sleep } = require('../utils/discordFetch');
 
 const app = express();
 const PORT = process.env.DASHBOARD_PORT || 3000;
@@ -62,7 +63,7 @@ app.get('/auth/callback', async (req, res) => {
   }
 
   try {
-    const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
+    const tokenRes = await discordFetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -75,12 +76,17 @@ app.get('/auth/callback', async (req, res) => {
     });
 
     const tokens = await tokenRes.json();
-    const userRes = await fetch('https://discord.com/api/users/@me', {
+
+    await sleep(500);
+
+    const userRes = await discordFetch('https://discord.com/api/users/@me', {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
     const user = await userRes.json();
 
-    const guildsRes = await fetch('https://discord.com/api/users/@me/guilds', {
+    await sleep(500);
+
+    const guildsRes = await discordFetch('https://discord.com/api/users/@me/guilds', {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
     const guilds = await guildsRes.json();
@@ -226,7 +232,7 @@ app.get('/api/guild/:guildId/leaderboard', requireAdmin, async (req, res) => {
 
     if (userIds.length > 0) {
       try {
-        const membersRes = await fetch(`https://discord.com/api/guilds/${req.params.guildId}/members/search?limit=100`, {
+        const membersRes = await discordFetch(`https://discord.com/api/guilds/${req.params.guildId}/members/search?limit=100`, {
           headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` },
         });
         if (membersRes.ok) {
