@@ -135,17 +135,19 @@ module.exports = async (client) => {
             const newMessage = await channel.send({
               embeds: [errorEmbed],
             });
-            server.messageId = newMessage.id; // Update message ID in DB
+            server.messageId = newMessage.id;
             await server.save();
           }
         } else {
           const newMessage = await channel.send({
             embeds: [errorEmbed],
           });
-          server.messageId = newMessage.id; // Save the message ID in DB
+          server.messageId = newMessage.id;
           await server.save();
         }
       }
+
+      await sleep(1000);
     }
   };
 
