@@ -271,7 +271,8 @@ async function postLeaderboardUpdate(client, guildId, channelId) {
     .setTitle('Leaderboard Update')
     .addFields(
       { name: 'Last Update', value: `<t:${Math.floor(lastUpdate.getTime() / 1000)}:F>`, inline: false },
-      { name: 'Updating in', value: nextUpdateText, inline: false }
+      { name: 'Updating in', value: nextUpdateText, inline: false },
+      { name: 'Full Leaderboard', value: '[View Full Leaderboard](https://eksostedbot-1.onrender.com/leaderboard)', inline: false }
     )
     .setColor('Blue')
     .setTimestamp(lastUpdate);
