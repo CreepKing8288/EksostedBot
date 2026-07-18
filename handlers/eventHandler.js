@@ -47,9 +47,6 @@ module.exports = (client) => {
                 event.execute(...args).catch(err => console.error(`Event error [${event.name}]:`, err));
               });
             }
-            if (file === 'starboard.js' || file === 'starboardRemove.js') {
-              console.log(`[Events] Registered: ${file} -> ${event.name}`);
-            }
             count++;
           }
         } catch (err) {

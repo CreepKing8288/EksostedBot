@@ -3,30 +3,29 @@ const Starboard = require('../models/Starboard');
 const { StarboardPost } = require('../models/Starboard');
 
 async function handleReaction(reaction, user, added) {
-  if (user.bot) return console.log('[Starboard] Skipped: bot user');
+  if (user.bot) return;
   if (reaction.partial) {
-    try { await reaction.fetch(); } catch { return console.log('[Starboard] Skipped: failed to fetch reaction'); }
+    try { await reaction.fetch(); } catch { return; }
   }
   if (reaction.message.partial) {
-    try { await reaction.message.fetch(); } catch { return console.log('[Starboard] Skipped: failed to fetch message'); }
+    try { await reaction.message.fetch(); } catch { return; }
   }
 
   const message = reaction.message;
-  if (!message.guild) return console.log('[Starboard] Skipped: not in a guild');
+  if (!message.guild) return;
 
   const config = await Starboard.findOne({ guildId: message.guild.id });
-  if (!config) return console.log('[Starboard] Skipped: no config found for guild');
-  if (!config.enabled) return console.log('[Starboard] Skipped: starboard disabled');
-  if (!config.channelId) return console.log('[Starboard] Skipped: no channel set');
-  if (config.ignoredChannels?.includes(message.channel.id)) return console.log('[Starboard] Skipped: channel ignored');
-  if (config.watchChannels?.length > 0 && !config.watchChannels.includes(message.channel.id)) return console.log('[Starboard] Skipped: channel not in watch list');
-  if (reaction.emoji.name !== config.emoji) return console.log(`[Starboard] Skipped: emoji mismatch (${reaction.emoji.name} !== ${config.emoji})`);
+  if (!config) return;
+  if (!config.enabled) return;
+  if (!config.channelId) return;
+  if (config.ignoredChannels?.includes(message.channel.id)) return;
+  if (config.watchChannels?.length > 0 && !config.watchChannels.includes(message.channel.id)) return;
+  if (reaction.emoji.name !== config.emoji) return;
 
   const starboardChannel = message.guild.channels.cache.get(config.channelId);
   if (!starboardChannel) return console.log('[Starboard] Skipped: starboard channel not found in cache');
 
   const count = reaction.count;
-  console.log(`[Starboard] Processing: count=${count}, threshold=${config.threshold}, added=${added}`);
   const existingPost = await StarboardPost.findOne({ guildId: message.guild.id, originalMessageId: message.id });
 
   if (added) {
