@@ -12,7 +12,6 @@ module.exports = {
         .setName('add')
         .setDescription('Add an item to the shop.')
         .addStringOption((o) => o.setName('name').setDescription('Item name.').setRequired(true))
-        .addStringOption((o) => o.setName('description').setDescription('Item description.'))
         .addIntegerOption((o) => o.setName('price').setDescription('Price in eksoscoin.').setRequired(true))
         .addStringOption((o) =>
           o
@@ -25,6 +24,7 @@ module.exports = {
               { name: 'Custom', value: 'custom' }
             )
         )
+        .addStringOption((o) => o.setName('description').setDescription('Item description.'))
         .addRoleOption((o) => o.setName('role').setDescription('Role to grant (for role type).'))
         .addNumberOption((o) =>
           o.setName('xp-multiplier').setDescription('XP multiplier (for xp_boost type).')
