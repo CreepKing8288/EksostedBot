@@ -35,6 +35,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (statusNav) statusNav.style.display = 'none';
     const annNav = document.querySelector('.nav-item[data-panel="announcement"]');
     if (annNav) annNav.style.display = 'none';
+    const coinNav = document.querySelector('.nav-item[data-panel="coinadmin"]');
+    if (coinNav) coinNav.style.display = 'none';
   }
 
   document.querySelectorAll('.nav-item').forEach(item => {
@@ -162,6 +164,7 @@ async function loadConfigs() {
     populateServerLogs(configs.serverlogs);
     populateAutoRoles(configs.AutoRole);
     populateButtonRole(configs.ButtonRole);
+    populateServerShop(configs.ServerShop);
     updateOverview(configs);
   } catch (err) {
     console.error('Failed to load configs:', err);
@@ -510,6 +513,8 @@ function switchPanel(panelName) {
     backup: 'Config Backup',
     botstatus: 'Bot Status',
     buttonroles: 'Button Roles',
+    servershop: 'Server Shop',
+    coinadmin: 'EksosCoin Admin',
   };
 
   document.getElementById('topbarTitle').textContent = titles[panelName] || 'Dashboard';
@@ -1417,6 +1422,204 @@ async function importBackup(event) {
     showToast(`Failed: ${err.message}`, 'error');
   }
   event.target.value = '';
+}
+
+// ===== SERVER SHOP =====
+let currentShopData = null;
+
+async function populateServerShop(data) {
+  currentShopData = data || { enabled: false, items: [], guildId: currentGuildId };
+  document.getElementById('shop-enabled').checked = currentShopData.enabled || false;
+
+  document.getElementById('shop-channel').value = currentShopData.shopChannelId || '';
+
+  renderShopItems();
+}
+
+function renderShopItems() {
+  const container = document.getElementById('shop-items-list');
+  if (!currentShopData || !currentShopData.items || currentShopData.items.length === 0) {
+    container.innerHTML = '<p style="color: #94a3b8; font-size: 0.9rem;">No items in the shop yet.</p>';
+    return;
+  }
+
+  const typeEmojis = { role: '🏷️', xp_boost: '⚡', custom: '🎁' };
+
+  container.innerHTML = currentShopData.items.map((item) => {
+    const emoji = typeEmojis[item.type] || '📦';
+    const status = item.enabled ? '✅' : '❌';
+    const stock = item.stock === -1 ? '∞' : item.stock;
+    return `
+      <div class="card" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 1rem; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+        <div>
+          <span style="font-size: 1.1rem;">${emoji}</span>
+          <strong style="color: #e2e8f0; margin-left: 0.5rem;">${escapeHtml(item.name)}</strong>
+          <span style="color: #94a3b8; margin-left: 0.5rem; font-size: 0.85rem;">${status}</span>
+          <span style="color: #f5a623; margin-left: 0.75rem; font-size: 0.85rem;">${item.price.toLocaleString()} eksoscoin</span>
+          <span style="color: #94a3b8; margin-left: 0.75rem; font-size: 0.8rem;">Stock: ${stock} | Sold: ${item.purchaseCount}</span>
+        </div>
+        <div>
+          <button class="btn btn-sm btn-danger" onclick="deleteShopItem('${item.itemId}')">Remove</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function saveShopSettings() {
+  if (!currentGuildId) return showToast('Select a server first', 'error');
+  try {
+    const payload = {
+      enabled: document.getElementById('shop-enabled').checked,
+      shopChannelId: document.getElementById('shop-channel').value || null,
+    };
+    const res = await fetch(`/api/guild/${currentGuildId}/shop`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    showToast('Shop settings saved!', 'success');
+  } catch (err) {
+    showToast(`Failed: ${err.message}`, 'error');
+  }
+}
+
+async function addShopItem() {
+  if (!currentGuildId) return showToast('Select a server first', 'error');
+  const name = document.getElementById('new-item-name').value.trim();
+  const price = parseInt(document.getElementById('new-item-price').value);
+  const type = document.getElementById('new-item-type').value;
+  const roleId = document.getElementById('new-item-role').value || null;
+  const xpMultiplier = parseFloat(document.getElementById('new-item-xp-mult').value) || 2;
+  const stock = parseInt(document.getElementById('new-item-stock').value) ?? -1;
+  const description = document.getElementById('new-item-desc').value.trim();
+
+  if (!name) return showToast('Enter an item name', 'error');
+  if (!price || price < 1) return showToast('Enter a valid price', 'error');
+
+  try {
+    const res = await fetch(`/api/guild/${currentGuildId}/shop/items`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, price, type, roleId, xpMultiplier, stock, description }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const shop = await res.json();
+    currentShopData = shop;
+    renderShopItems();
+    showToast('Item added!', 'success');
+
+    document.getElementById('new-item-name').value = '';
+    document.getElementById('new-item-price').value = '';
+    document.getElementById('new-item-desc').value = '';
+  } catch (err) {
+    showToast(`Failed: ${err.message}`, 'error');
+  }
+}
+
+async function deleteShopItem(itemId) {
+  if (!confirm('Remove this item from the shop?')) return;
+  if (!currentGuildId) return showToast('Select a server first', 'error');
+  try {
+    const res = await fetch(`/api/guild/${currentGuildId}/shop/items/${itemId}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(await res.text());
+    const shop = await res.json();
+    currentShopData = shop;
+    renderShopItems();
+    showToast('Item removed', 'success');
+  } catch (err) {
+    showToast(`Failed: ${err.message}`, 'error');
+  }
+}
+
+// ===== EKSOSCOIN ADMIN =====
+let coinAdminCurrentUserId = null;
+
+async function coinAdminSearch() {
+  const userId = document.getElementById('coinadmin-userid').value.trim();
+  if (!userId) return showToast('Enter a user ID', 'error');
+  if (!/^\d+$/.test(userId)) return showToast('Invalid user ID format', 'error');
+
+  try {
+    const res = await fetch(`/api/coin/${userId}`);
+    if (!res.ok) throw new Error('Failed to fetch user data');
+    const data = await res.json();
+
+    coinAdminCurrentUserId = userId;
+    document.getElementById('coinadmin-result').style.display = 'block';
+    document.getElementById('coinadmin-wallet').textContent = (data.balance || 0).toLocaleString();
+    document.getElementById('coinadmin-bank').textContent = (data.bank || 0).toLocaleString();
+    document.getElementById('coinadmin-earned').textContent = (data.totalEarned || 0).toLocaleString();
+    document.getElementById('coinadmin-spent').textContent = (data.totalSpent || 0).toLocaleString();
+    document.getElementById('coinadmin-new-wallet').value = data.balance || 0;
+    document.getElementById('coinadmin-new-bank').value = data.bank || 0;
+    document.getElementById('coinadmin-id').textContent = `ID: ${userId}`;
+
+    if (data.username) {
+      document.getElementById('coinadmin-username').textContent = data.username;
+    } else {
+      document.getElementById('coinadmin-username').textContent = `User ${userId}`;
+    }
+
+    const avatarEl = document.getElementById('coinadmin-avatar');
+    if (data.username && data.avatar) {
+      avatarEl.innerHTML = `<img src="https://cdn.discordapp.com/avatars/${userId}/${data.avatar}.png?size=48" style="width:48px;height:48px;border-radius:50%;" onerror="this.parentElement.textContent='${(data.username || '?')[0].toUpperCase()}'">`;
+    } else if (data.username) {
+      avatarEl.textContent = data.username[0].toUpperCase();
+    } else {
+      avatarEl.textContent = '?';
+    }
+
+  } catch (err) {
+    showToast(`Failed: ${err.message}`, 'error');
+  }
+}
+
+async function coinAdminSave() {
+  if (!coinAdminCurrentUserId) return showToast('Search for a user first', 'error');
+
+  const balance = parseInt(document.getElementById('coinadmin-new-wallet').value) || 0;
+  const bank = parseInt(document.getElementById('coinadmin-new-bank').value) || 0;
+
+  try {
+    const res = await fetch(`/api/coin/${coinAdminCurrentUserId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ balance, bank }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to save');
+    }
+    const data = await res.json();
+    document.getElementById('coinadmin-wallet').textContent = (data.balance || 0).toLocaleString();
+    document.getElementById('coinadmin-bank').textContent = (data.bank || 0).toLocaleString();
+    showToast('Balance updated!', 'success');
+  } catch (err) {
+    showToast(`Failed: ${err.message}`, 'error');
+  }
+}
+
+async function coinAdminReset() {
+  if (!coinAdminCurrentUserId) return showToast('Search for a user first', 'error');
+  if (!confirm('Reset this user\'s balance to 0 wallet / 0 bank?')) return;
+
+  try {
+    const res = await fetch(`/api/coin/${coinAdminCurrentUserId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ balance: 0, bank: 0 }),
+    });
+    if (!res.ok) throw new Error('Failed to reset');
+    document.getElementById('coinadmin-wallet').textContent = '0';
+    document.getElementById('coinadmin-bank').textContent = '0';
+    document.getElementById('coinadmin-new-wallet').value = 0;
+    document.getElementById('coinadmin-new-bank').value = 0;
+    showToast('User balance reset to 0', 'success');
+  } catch (err) {
+    showToast(`Failed: ${err.message}`, 'error');
+  }
 }
 
 function escapeHtml(text) {

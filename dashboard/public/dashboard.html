@@ -76,6 +76,9 @@
           <a href="#" class="nav-item" data-panel="crates">
             <span class="nav-icon">🏗️</span> Crate Drops
           </a>
+          <a href="#" class="nav-item" data-panel="servershop">
+            <span class="nav-icon">🛒</span> Server Shop
+          </a>
         </div>
 
         <div class="nav-section">
@@ -146,6 +149,9 @@
           </a>
           <a href="#" class="nav-item" data-panel="announcement">
             <span class="nav-icon">📢</span> Global Announcement
+          </a>
+          <a href="#" class="nav-item" data-panel="coinadmin">
+            <span class="nav-icon">💰</span> EksosCoin Admin
           </a>
         </div>
       </nav>
@@ -1361,6 +1367,151 @@
               <small style="color: var(--text-muted); font-size: 0.75rem;">Format: [{"label":"Name","roleId":"ID","style":"Primary|Secondary|Success|Danger"}]</small>
             </div>
             <button class="btn btn-primary" onclick="saveButtonRole()">Create Panel</button>
+          </div>
+        </div>
+
+        <!-- SERVER SHOP PANEL -->
+        <div class="panel" id="panel-servershop">
+          <div class="panel-header">
+            <h2>Server Shop</h2>
+            <p>Manage the EksosCoin shop for this server. Add items that members can buy with their coins.</p>
+          </div>
+          <div class="panel-body">
+            <div class="form-group">
+              <label class="form-label">Shop Enabled</label>
+              <div class="toggle-switch">
+                <input type="checkbox" id="shop-enabled" class="form-check">
+                <label for="shop-enabled"></label>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Shop Channel ID (optional)</label>
+              <input type="text" id="shop-channel" class="form-input" placeholder="Channel ID for shop messages">
+            </div>
+            <button class="btn btn-primary" onclick="saveShopSettings()" style="margin-bottom: 1.5rem;">Save Settings</button>
+
+            <hr style="border-color: rgba(255,255,255,0.1); margin: 1.5rem 0;">
+
+            <h3 style="color: #e2e8f0; margin-bottom: 1rem;">Shop Items</h3>
+
+            <div id="shop-items-list" style="margin-bottom: 1rem;"></div>
+
+            <div class="card" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 1.25rem;">
+              <h4 style="color: #e2e8f0; margin-bottom: 0.75rem;">Add New Item</h4>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Name</label>
+                  <input type="text" id="new-item-name" class="form-input" placeholder="VIP Role">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Price (eksoscoin)</label>
+                  <input type="number" id="new-item-price" class="form-input" placeholder="1000" min="1">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Type</label>
+                  <select id="new-item-type" class="form-select">
+                    <option value="role">Role</option>
+                    <option value="xp_boost">XP Boost</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Role ID (for role type)</label>
+                  <input type="text" id="new-item-role" class="form-input" placeholder="Role ID to assign">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">XP Multiplier (for xp_boost)</label>
+                  <input type="number" id="new-item-xp-mult" class="form-input" placeholder="2" min="0.1" step="0.1" value="2">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Stock (-1 = unlimited)</label>
+                  <input type="number" id="new-item-stock" class="form-input" placeholder="-1" value="-1">
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Description</label>
+                <input type="text" id="new-item-desc" class="form-input" placeholder="Grants VIP role for 30 days">
+              </div>
+              <button class="btn btn-primary" onclick="addShopItem()">Add Item</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- EKSOSCOIN ADMIN PANEL (Owner Only) -->
+        <div class="panel" id="panel-coinadmin">
+          <div class="panel-header">
+            <h2>EksosCoin Admin</h2>
+            <p>Search and modify any user's global EksosCoin balance.</p>
+          </div>
+          <div class="panel-body">
+            <div class="form-row">
+              <div class="form-group" style="flex: 2;">
+                <label class="form-label">User ID</label>
+                <input type="text" id="coinadmin-userid" class="form-input" placeholder="Discord User ID">
+              </div>
+              <div class="form-group" style="flex: 0; align-self: flex-end;">
+                <button class="btn btn-primary" onclick="coinAdminSearch()" style="margin-bottom: 0;">Search</button>
+              </div>
+            </div>
+
+            <div id="coinadmin-result" style="display: none; margin-top: 1.5rem;">
+              <div class="card" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 1.5rem;">
+                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
+                  <div id="coinadmin-avatar" style="width: 48px; height: 48px; border-radius: 50%; background: #5865f2; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; color: white; font-weight: 700;"></div>
+                  <div>
+                    <div id="coinadmin-username" style="color: #e2e8f0; font-size: 1.1rem; font-weight: 600;"></div>
+                    <div id="coinadmin-id" style="color: #94a3b8; font-size: 0.85rem;"></div>
+                  </div>
+                </div>
+
+                <div class="stats-grid" style="margin-bottom: 1.5rem;">
+                  <div class="stat-card">
+                    <div class="stat-info">
+                      <div class="stat-label">Wallet</div>
+                      <div class="stat-value" id="coinadmin-wallet">0</div>
+                    </div>
+                  </div>
+                  <div class="stat-card">
+                    <div class="stat-info">
+                      <div class="stat-label">Bank</div>
+                      <div class="stat-value" id="coinadmin-bank">0</div>
+                    </div>
+                  </div>
+                  <div class="stat-card">
+                    <div class="stat-info">
+                      <div class="stat-label">Total Earned</div>
+                      <div class="stat-value" id="coinadmin-earned">0</div>
+                    </div>
+                  </div>
+                  <div class="stat-card">
+                    <div class="stat-info">
+                      <div class="stat-label">Total Spent</div>
+                      <div class="stat-value" id="coinadmin-spent">0</div>
+                    </div>
+                  </div>
+                </div>
+
+                <h4 style="color: #e2e8f0; margin-bottom: 1rem;">Modify Balance</h4>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">New Wallet Balance</label>
+                    <input type="number" id="coinadmin-new-wallet" class="form-input" min="0">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">New Bank Balance</label>
+                    <input type="number" id="coinadmin-new-bank" class="form-input" min="0">
+                  </div>
+                </div>
+                <div style="display: flex; gap: 0.75rem; margin-top: 1rem;">
+                  <button class="btn btn-primary" onclick="coinAdminSave()">Save Changes</button>
+                  <button class="btn btn-danger" onclick="coinAdminReset()">Reset User (0/0)</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

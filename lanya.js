@@ -201,7 +201,7 @@ app.get('/api/guild/:guildId/configs', requireAuth, async (req, res) => {
       'SwearFilter', 'AntiSpam', 'LinkFilter', 'Starboard',
       'CrateConfig', 'TicketSettings', 'AFK',
       'AIChatConfig', 'ProtectionSettings', 'serverlogs',
-      'ButtonRole', 'ServerStatus',
+      'ButtonRole', 'ServerStatus', 'ServerShop',
     ];
 
     for (const modelName of modelsWithGuildId) {
@@ -1067,6 +1067,142 @@ app.get('/api/public/guild/:guildId/leaderboard', async (req, res) => {
   } catch (err) {
     console.error('Error fetching public leaderboard:', err);
     res.status(500).json({ error: 'Failed to fetch leaderboard' });
+  }
+});
+
+// ===== EKSOSCOIN & SHOP API =====
+app.get('/api/coin/:userId', requireAuth, async (req, res) => {
+  try {
+    const EksosCoin = require('./models/EksosCoin');
+    const userData = await EksosCoin.findOne({ userId: req.params.userId });
+    const result = userData
+      ? userData.toObject()
+      : { userId: req.params.userId, balance: 0, bank: 0, totalEarned: 0, totalSpent: 0 };
+
+    // Enrich with Discord user info if bot token available
+    if (DISCORD_BOT_TOKEN) {
+      try {
+        const { discordFetch: df } = require('./utils/discordFetch');
+        const userRes = await df(`https://discord.com/api/users/${req.params.userId}`, {
+          headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` },
+        });
+        if (userRes.ok) {
+          const discordUser = await userRes.json();
+          result.username = discordUser.username;
+          result.avatar = discordUser.avatar;
+          result.discriminator = discordUser.discriminator;
+        }
+      } catch {}
+    }
+
+    res.json(result);
+  } catch (err) {
+    console.error('Error fetching coin data:', err);
+    res.status(500).json({ error: 'Failed to fetch coin data' });
+  }
+});
+
+app.post('/api/coin/:userId', requireOwner, async (req, res) => {
+  try {
+    const EksosCoin = require('./models/EksosCoin');
+    const { balance, bank } = req.body;
+    const update = {};
+    if (balance !== undefined) update.balance = balance;
+    if (bank !== undefined) update.bank = bank;
+    const userData = await EksosCoin.findOneAndUpdate(
+      { userId: req.params.userId },
+      { $set: update },
+      { upsert: true, new: true }
+    );
+    res.json(userData);
+  } catch (err) {
+    console.error('Error updating coin data:', err);
+    res.status(500).json({ error: 'Failed to update coin data' });
+  }
+});
+
+app.get('/api/coin-leaderboard/top', requireAuth, async (req, res) => {
+  try {
+    const EksosCoin = require('./models/EksosCoin');
+    const top = await EksosCoin.find({}).sort({ balance: -1 }).limit(50).lean();
+    res.json(top);
+  } catch (err) {
+    console.error('Error fetching coin leaderboard:', err);
+    res.status(500).json({ error: 'Failed to fetch leaderboard' });
+  }
+});
+
+app.get('/api/guild/:guildId/shop', requireAuth, async (req, res) => {
+  try {
+    const ServerShop = require('./models/ServerShop');
+    const shop = await ServerShop.findOne({ guildId: req.params.guildId });
+    res.json(shop || { guildId: req.params.guildId, enabled: false, items: [] });
+  } catch (err) {
+    console.error('Error fetching shop:', err);
+    res.status(500).json({ error: 'Failed to fetch shop' });
+  }
+});
+
+app.post('/api/guild/:guildId/shop', requireAuth, async (req, res) => {
+  try {
+    const ServerShop = require('./models/ServerShop');
+    const { enabled, shopChannelId, items } = req.body;
+    const update = {};
+    if (enabled !== undefined) update.enabled = enabled;
+    if (shopChannelId !== undefined) update.shopChannelId = shopChannelId;
+    if (items !== undefined) update.items = items;
+    const shop = await ServerShop.findOneAndUpdate(
+      { guildId: req.params.guildId },
+      { $set: update },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    res.json(shop);
+  } catch (err) {
+    console.error('Error saving shop:', err);
+    res.status(500).json({ error: 'Failed to save shop' });
+  }
+});
+
+app.post('/api/guild/:guildId/shop/items', requireAuth, async (req, res) => {
+  try {
+    const ServerShop = require('./models/ServerShop');
+    const crypto = require('crypto');
+    let shop = await ServerShop.findOne({ guildId: req.params.guildId });
+    if (!shop) {
+      shop = new ServerShop({ guildId: req.params.guildId });
+    }
+    const item = {
+      itemId: crypto.randomBytes(4).toString('hex'),
+      name: req.body.name,
+      description: req.body.description || '',
+      price: req.body.price,
+      type: req.body.type,
+      roleId: req.body.roleId || null,
+      xpMultiplier: req.body.xpMultiplier || 1,
+      stock: req.body.stock ?? -1,
+      purchaseCount: 0,
+      enabled: true,
+    };
+    shop.items.push(item);
+    await shop.save();
+    res.json(shop);
+  } catch (err) {
+    console.error('Error adding shop item:', err);
+    res.status(500).json({ error: 'Failed to add item' });
+  }
+});
+
+app.delete('/api/guild/:guildId/shop/items/:itemId', requireAuth, async (req, res) => {
+  try {
+    const ServerShop = require('./models/ServerShop');
+    const shop = await ServerShop.findOne({ guildId: req.params.guildId });
+    if (!shop) return res.status(404).json({ error: 'Shop not found' });
+    shop.items = shop.items.filter((i) => i.itemId !== req.params.itemId);
+    await shop.save();
+    res.json(shop);
+  } catch (err) {
+    console.error('Error removing shop item:', err);
+    res.status(500).json({ error: 'Failed to remove item' });
   }
 });
 
