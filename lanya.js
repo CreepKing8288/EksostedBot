@@ -1146,11 +1146,12 @@ app.get('/api/guild/:guildId/shop', requireAuth, async (req, res) => {
 app.post('/api/guild/:guildId/shop', requireAuth, async (req, res) => {
   try {
     const ServerShop = require('./models/ServerShop');
-    const { enabled, shopChannelId, items } = req.body;
+    const { enabled, shopChannelId, items, transferFeePercent } = req.body;
     const update = {};
     if (enabled !== undefined) update.enabled = enabled;
     if (shopChannelId !== undefined) update.shopChannelId = shopChannelId;
     if (items !== undefined) update.items = items;
+    if (transferFeePercent !== undefined) update.transferFeePercent = Math.min(100, Math.max(0, Number(transferFeePercent)));
     const shop = await ServerShop.findOneAndUpdate(
       { guildId: req.params.guildId },
       { $set: update },

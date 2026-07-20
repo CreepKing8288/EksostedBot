@@ -1388,6 +1388,10 @@
               <label class="form-label">Shop Channel ID (optional)</label>
               <input type="text" id="shop-channel" class="form-input" placeholder="Channel ID for shop messages">
             </div>
+            <div class="form-group">
+              <label class="form-label">Transfer Fee (%)</label>
+              <input type="number" id="shop-transfer-fee" class="form-input" min="0" max="100" value="5" placeholder="5">
+            </div>
             <button class="btn btn-primary" onclick="saveShopSettings()" style="margin-bottom: 1.5rem;">Save Settings</button>
 
             <hr style="border-color: rgba(255,255,255,0.1); margin: 1.5rem 0;">
@@ -1448,6 +1452,8 @@
             <p>Search and modify any user's global EksosCoin balance.</p>
           </div>
           <div class="panel-body">
+            <h4 style="color: #e2e8f0; margin-bottom: 1rem;">User Balance Editor</h4>
+
             <div class="form-row">
               <div class="form-group" style="flex: 2;">
                 <label class="form-label">User ID</label>

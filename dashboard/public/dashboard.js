@@ -1430,8 +1430,8 @@ let currentShopData = null;
 async function populateServerShop(data) {
   currentShopData = data || { enabled: false, items: [], guildId: currentGuildId };
   document.getElementById('shop-enabled').checked = currentShopData.enabled || false;
-
   document.getElementById('shop-channel').value = currentShopData.shopChannelId || '';
+  document.getElementById('shop-transfer-fee').value = currentShopData.transferFeePercent ?? 5;
 
   renderShopItems();
 }
@@ -1469,9 +1469,12 @@ function renderShopItems() {
 async function saveShopSettings() {
   if (!currentGuildId) return showToast('Select a server first', 'error');
   try {
+    const fee = parseInt(document.getElementById('shop-transfer-fee').value);
+    if (isNaN(fee) || fee < 0 || fee > 100) return showToast('Fee must be between 0 and 100', 'error');
     const payload = {
       enabled: document.getElementById('shop-enabled').checked,
       shopChannelId: document.getElementById('shop-channel').value || null,
+      transferFeePercent: fee,
     };
     const res = await fetch(`/api/guild/${currentGuildId}/shop`, {
       method: 'POST',
