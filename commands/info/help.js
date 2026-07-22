@@ -51,7 +51,6 @@ module.exports = {
       music: { name: 'Music', emoji: '🎵' },
       moderation: { name: 'Moderation', emoji: '🔨' },
       utility: { name: 'Utility', emoji: '🪛' },
-      minecraft: { name: 'Minecraft', emoji: '🟩' },
       info: { name: 'Information', emoji: 'ℹ️' },
       tickets: { name: 'Tickets', emoji: '🎫' },
     };

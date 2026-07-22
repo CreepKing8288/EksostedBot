@@ -23,6 +23,8 @@ const serverShopSchema = new mongoose.Schema({
   shopChannelId: { type: String, default: null },
   items: { type: [shopItemSchema], default: [] },
   transferFeePercent: { type: Number, default: 5, min: 0, max: 100 },
+  bankInterestRate: { type: Number, default: 10, min: 0, max: 100 },
+  bankMaxLoan: { type: Number, default: 10000, min: 0 },
 });
 
 module.exports = mongoose.model('ServerShop', serverShopSchema);

@@ -631,6 +631,73 @@ async function runMines(interaction, bet) {
   });
 }
 
+// ── Color Game ──
+
+const COLORS = [
+  { name: 'red', emoji: '🔴', weight: 50, multiplier: 2 },
+  { name: 'yellow', emoji: '🟡', weight: 30, multiplier: 3 },
+  { name: 'green', emoji: '🟢', weight: 20, multiplier: 5 },
+];
+
+function pickColor() {
+  const total = COLORS.reduce((a, c) => a + c.weight, 0);
+  let r = Math.random() * total;
+  for (const c of COLORS) {
+    r -= c.weight;
+    if (r <= 0) return c;
+  }
+  return COLORS[COLORS.length - 1];
+}
+
+async function runColor(interaction, bet, choice) {
+  const userData = await getUserData(interaction.user.id);
+  if (userData.balance < bet) {
+    return interaction.reply({ embeds: [insufficientFunds(bet, userData.balance)], ephemeral: true });
+  }
+
+  const picked = COLORS.find((c) => c.name === choice);
+  const result = pickColor();
+  const won = result.name === choice;
+
+  userData.balance -= bet;
+  userData.totalSpent += bet;
+
+  let embedColor, desc;
+  if (won) {
+    const winnings = Math.floor(bet * picked.multiplier);
+    userData.balance += winnings;
+    userData.totalEarned += winnings;
+    embedColor = 0x57f287;
+    desc = `The wheel landed on ${result.emoji} **${result.name.toUpperCase()}**!\nYou won **${winnings.toLocaleString()} eksoscoin**! (${picked.multiplier}x)`;
+  } else {
+    embedColor = 0xed4245;
+    desc = `The wheel landed on ${result.emoji} **${result.name.toUpperCase()}**!\nYou lost **${bet.toLocaleString()} eksoscoin**!`;
+  }
+  await userData.save();
+
+  const colorBar = COLORS.map((c) => {
+    const bar = '█'.repeat(Math.round(c.weight / 5));
+    const marker = c.name === choice ? ' ◄' : '';
+    return `${c.emoji} ${c.name.charAt(0).toUpperCase() + c.name.slice(1)}: ${bar} (${c.multiplier}x)${marker}`;
+  }).join('\n');
+
+  return interaction.reply({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(embedColor)
+        .setTitle('🎨 Color Game')
+        .setDescription(desc)
+        .addFields(
+          { name: 'Your Pick', value: `${picked.emoji} ${picked.name.charAt(0).toUpperCase() + picked.name.slice(1)} (${picked.multiplier}x)`, inline: true },
+          { name: 'Result', value: `${result.emoji} ${result.name.charAt(0).toUpperCase() + result.name.slice(1)}`, inline: true },
+          { name: 'Balance', value: `${userData.balance.toLocaleString()} eksoscoin`, inline: true },
+          { name: 'Odds', value: `\`\`\`\n${colorBar}\n\`\`\``, inline: false }
+        )
+        .setTimestamp(),
+    ],
+  });
+}
+
 // ── Main Command ──
 
 module.exports = {
@@ -717,6 +784,25 @@ module.exports = {
         .addIntegerOption((o) =>
           o.setName('bet').setDescription('Amount to bet.').setRequired(true).setMinValue(10)
         )
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('color')
+        .setDescription('Pick a color and spin the wheel!')
+        .addIntegerOption((o) =>
+          o.setName('bet').setDescription('Amount to bet.').setRequired(true).setMinValue(10)
+        )
+        .addStringOption((o) =>
+          o
+            .setName('choice')
+            .setDescription('Pick a color.')
+            .setRequired(true)
+            .addChoices(
+              { name: '🔴 Red (2x)', value: 'red' },
+              { name: '🟡 Yellow (3x)', value: 'yellow' },
+              { name: '🟢 Green (5x)', value: 'green' }
+            )
+        )
     ),
 
   async execute(interaction) {
@@ -742,6 +828,10 @@ module.exports = {
       }
       case 'mines':
         return runMines(interaction, bet);
+      case 'color': {
+        const choice = interaction.options.getString('choice');
+        return runColor(interaction, bet, choice);
+      }
     }
   },
 };
