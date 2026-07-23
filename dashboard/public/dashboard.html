@@ -153,6 +153,9 @@
           <a href="#" class="nav-item" data-panel="coinadmin">
             <span class="nav-icon">💰</span> EksosCoin Admin
           </a>
+          <a href="#" class="nav-item" data-panel="casinoconfig">
+            <span class="nav-icon">🎰</span> Casino Config
+          </a>
         </div>
       </nav>
 
@@ -1518,6 +1521,152 @@
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- CASINO CONFIG PANEL (Owner Only) -->
+        <div class="panel" id="panel-casinoconfig">
+          <div class="panel-header">
+            <h2>Casino Config</h2>
+            <p>Configure win rates and payouts for all casino games. Global (affects all servers).</p>
+          </div>
+          <div class="panel-body">
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 1.25rem;">
+
+              <!-- SLOT MACHINE -->
+              <div class="card" style="max-width:none;">
+                <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 1rem;">🎰 Slot Machine</h3>
+                <div class="form-group">
+                  <label class="form-label">Symbol Weights (bar, bell, seven, cherry, diamond, star)</label>
+                  <input type="text" class="form-input" id="casino-slotWeights" placeholder="25,20,5,25,10,15">
+                  <small style="color: var(--text-muted); font-size: 0.7rem;">Comma-separated. Higher = more frequent.</small>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">Triple Jackpot ×</label>
+                    <input type="number" class="form-input" id="casino-slotJackpotMult" min="1">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Triple Match ×</label>
+                    <input type="number" class="form-input" id="casino-slotTripleMult" min="1">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Double Match ×</label>
+                    <input type="number" class="form-input" id="casino-slotDoubleMult" min="1">
+                  </div>
+                </div>
+              </div>
+
+              <!-- COINFLIP -->
+              <div class="card" style="max-width:none;">
+                <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 1rem;">🪙 Coinflip</h3>
+                <div class="form-group">
+                  <label class="form-label">Win Rate (%)</label>
+                  <input type="number" class="form-input" id="casino-coinflipWinRate" min="0" max="100" step="0.1">
+                  <small style="color: var(--text-muted); font-size: 0.7rem;">Default: 48% (house edge).</small>
+                </div>
+              </div>
+
+              <!-- DICE -->
+              <div class="card" style="max-width:none;">
+                <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 1rem;">🎲 Dice</h3>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">Under 3 × (roll 1-2)</label>
+                    <input type="number" class="form-input" id="casino-diceUnderMult" min="1" step="0.1">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Exact 3 × (roll 3)</label>
+                    <input type="number" class="form-input" id="casino-diceExactMult" min="1" step="0.1">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Over 4 × (roll 4-6)</label>
+                    <input type="number" class="form-input" id="casino-diceOverMult" min="1" step="0.1">
+                  </div>
+                </div>
+              </div>
+
+              <!-- BLACKJACK -->
+              <div class="card" style="max-width:none;">
+                <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 1rem;">🃏 Blackjack</h3>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">Win ×</label>
+                    <input type="number" class="form-input" id="casino-blackjackWinMult" min="1" step="0.1">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Blackjack 21 ×</label>
+                    <input type="number" class="form-input" id="casino-blackjackBjMult" min="1" step="0.1">
+                  </div>
+                </div>
+              </div>
+
+              <!-- ROULETTE -->
+              <div class="card" style="max-width:none;">
+                <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 1rem;">🎡 Roulette</h3>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">Color Win ×</label>
+                    <input type="number" class="form-input" id="casino-rouletteColorMult" min="1" step="0.1">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Green (0) ×</label>
+                    <input type="number" class="form-input" id="casino-rouletteGreenMult" min="1" step="0.1">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Number Win ×</label>
+                    <input type="number" class="form-input" id="casino-rouletteNumberMult" min="1" step="0.1">
+                  </div>
+                </div>
+              </div>
+
+              <!-- MINES -->
+              <div class="card" style="max-width:none;">
+                <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 1rem;">💣 Mines</h3>
+                <div class="form-group">
+                  <label class="form-label">Number of Mines</label>
+                  <input type="number" class="form-input" id="casino-minesCount" min="1" max="15">
+                  <small style="color: var(--text-muted); font-size: 0.7rem;">Grid is 4×4 (16 tiles). Max 15.</small>
+                </div>
+              </div>
+
+              <!-- COLOR GAME -->
+              <div class="card" style="max-width:none;">
+                <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 1rem;">🎨 Color Game</h3>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">Red Weight</label>
+                    <input type="number" class="form-input" id="casino-colorRedWeight" min="0">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Red ×</label>
+                    <input type="number" class="form-input" id="casino-colorRedMult" min="1" step="0.1">
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">Yellow Weight</label>
+                    <input type="number" class="form-input" id="casino-colorYellowWeight" min="0">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Yellow ×</label>
+                    <input type="number" class="form-input" id="casino-colorYellowMult" min="1" step="0.1">
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">Green Weight</label>
+                    <input type="number" class="form-input" id="casino-colorGreenWeight" min="0">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Green ×</label>
+                    <input type="number" class="form-input" id="casino-colorGreenMult" min="1" step="0.1">
+                  </div>
+                </div>
+              </div>
+
+            </div>
+            <button class="btn btn-primary" onclick="saveCasinoConfig()" style="margin-top: 1.5rem;">Save Casino Config</button>
           </div>
         </div>
 

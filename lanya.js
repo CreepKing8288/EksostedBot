@@ -1247,10 +1247,6 @@ app.post('/api/casino-config', requireOwner, async (req, res) => {
   }
 });
 
-app.get('/casino-config', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dashboard', 'public', 'casino-config.html'));
-});
-
 app.listen(DASHBOARD_PORT, () => {
   console.log(`✅ Dashboard running on http://localhost:${DASHBOARD_PORT}`);
 });

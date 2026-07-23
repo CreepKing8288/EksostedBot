@@ -37,6 +37,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (annNav) annNav.style.display = 'none';
     const coinNav = document.querySelector('.nav-item[data-panel="coinadmin"]');
     if (coinNav) coinNav.style.display = 'none';
+    const casinoNav = document.querySelector('.nav-item[data-panel="casinoconfig"]');
+    if (casinoNav) casinoNav.style.display = 'none';
   }
 
   document.querySelectorAll('.nav-item').forEach(item => {
@@ -515,6 +517,7 @@ function switchPanel(panelName) {
     buttonroles: 'Button Roles',
     servershop: 'Server Shop',
     coinadmin: 'EksosCoin Admin',
+    casinoconfig: 'Casino Config',
   };
 
   document.getElementById('topbarTitle').textContent = titles[panelName] || 'Dashboard';
@@ -542,6 +545,9 @@ function switchPanel(panelName) {
   }
   if (panelName === 'templates') {
     loadTemplates();
+  }
+  if (panelName === 'casinoconfig') {
+    loadCasinoConfig();
   }
 }
 
@@ -1620,6 +1626,63 @@ async function coinAdminReset() {
     document.getElementById('coinadmin-new-wallet').value = 0;
     document.getElementById('coinadmin-new-bank').value = 0;
     showToast('User balance reset to 0', 'success');
+  } catch (err) {
+    showToast(`Failed: ${err.message}`, 'error');
+  }
+}
+
+// ===== CASINO CONFIG =====
+async function loadCasinoConfig() {
+  try {
+    const res = await fetch('/api/casino-config');
+    if (!res.ok) throw new Error('Failed to load');
+    const config = await res.json();
+
+    const fields = [
+      'slotJackpotMult', 'slotTripleMult', 'slotDoubleMult',
+      'coinflipWinRate',
+      'diceUnderMult', 'diceExactMult', 'diceOverMult',
+      'blackjackWinMult', 'blackjackBjMult',
+      'rouletteColorMult', 'rouletteGreenMult', 'rouletteNumberMult',
+      'minesCount',
+      'colorRedWeight', 'colorRedMult', 'colorYellowWeight', 'colorYellowMult', 'colorGreenWeight', 'colorGreenMult',
+    ];
+    fields.forEach(f => {
+      const el = document.getElementById('casino-' + f);
+      if (el) el.value = config[f] ?? '';
+    });
+    document.getElementById('casino-slotWeights').value = (config.slotWeights || []).join(',');
+  } catch (err) {
+    showToast('Failed to load casino config.', 'error');
+  }
+}
+
+async function saveCasinoConfig() {
+  const payload = {};
+  const numFields = [
+    'slotJackpotMult', 'slotTripleMult', 'slotDoubleMult',
+    'coinflipWinRate',
+    'diceUnderMult', 'diceExactMult', 'diceOverMult',
+    'blackjackWinMult', 'blackjackBjMult',
+    'rouletteColorMult', 'rouletteGreenMult', 'rouletteNumberMult',
+    'minesCount',
+    'colorRedWeight', 'colorRedMult', 'colorYellowWeight', 'colorYellowMult', 'colorGreenWeight', 'colorGreenMult',
+  ];
+  numFields.forEach(f => {
+    const el = document.getElementById('casino-' + f);
+    if (el) payload[f] = parseFloat(el.value) || 0;
+  });
+  payload.slotWeights = document.getElementById('casino-slotWeights').value
+    .split(',').map(v => parseInt(v.trim())).filter(v => !isNaN(v));
+
+  try {
+    const res = await fetch('/api/casino-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Failed to save');
+    showToast('Casino config saved!', 'success');
   } catch (err) {
     showToast(`Failed: ${err.message}`, 'error');
   }
