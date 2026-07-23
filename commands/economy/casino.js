@@ -471,10 +471,11 @@ async function runMines(interaction, bet, bombCount) {
   await userData.save();
 
   let revealed = new Set();
-  let multiplier = 2;
+  let multiplier = 1;
 
   function calcMultiplier(revealedCount) {
-    return 2 * safe_tiles / (safe_tiles - revealedCount);
+    if (revealedCount === 0) return 1;
+    return safe_tiles / (safe_tiles - revealedCount);
   }
 
   function buildGrid() {
