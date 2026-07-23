@@ -1207,6 +1207,50 @@ app.delete('/api/guild/:guildId/shop/items/:itemId', requireAuth, async (req, re
   }
 });
 
+// ===== CASINO CONFIG API (Owner Only) =====
+app.get('/api/casino-config', requireOwner, async (req, res) => {
+  try {
+    const CasinoConfig = require('./models/CasinoConfig');
+    let config = await CasinoConfig.findOne({ _id: 'global' });
+    if (!config) config = await CasinoConfig.create({ _id: 'global' });
+    res.json(config);
+  } catch (err) {
+    console.error('Error fetching casino config:', err);
+    res.status(500).json({ error: 'Failed to fetch casino config' });
+  }
+});
+
+app.post('/api/casino-config', requireOwner, async (req, res) => {
+  try {
+    const CasinoConfig = require('./models/CasinoConfig');
+    const allowedFields = [
+      'slotWeights', 'slotSymbols', 'slotJackpotMult', 'slotTripleMult', 'slotDoubleMult',
+      'coinflipWinRate', 'diceUnderMult', 'diceExactMult', 'diceOverMult',
+      'blackjackWinMult', 'blackjackBjMult',
+      'rouletteColorMult', 'rouletteGreenMult', 'rouletteNumberMult',
+      'minesCount',
+      'colorRedWeight', 'colorRedMult', 'colorYellowWeight', 'colorYellowMult', 'colorGreenWeight', 'colorGreenMult',
+    ];
+    const update = {};
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) update[field] = req.body[field];
+    }
+    const config = await CasinoConfig.findOneAndUpdate(
+      { _id: 'global' },
+      { $set: update },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    res.json(config);
+  } catch (err) {
+    console.error('Error saving casino config:', err);
+    res.status(500).json({ error: 'Failed to save casino config' });
+  }
+});
+
+app.get('/casino-config', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dashboard', 'public', 'casino-config.html'));
+});
+
 app.listen(DASHBOARD_PORT, () => {
   console.log(`✅ Dashboard running on http://localhost:${DASHBOARD_PORT}`);
 });

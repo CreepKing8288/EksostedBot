@@ -6,6 +6,7 @@ const {
   ButtonStyle,
 } = require('discord.js');
 const EksosCoin = require('../../models/EksosCoin');
+const CasinoConfig = require('../../models/CasinoConfig');
 
 // ── Shared helpers ──
 
@@ -13,6 +14,12 @@ async function getUserData(userId) {
   let userData = await EksosCoin.findOne({ userId });
   if (!userData) userData = await EksosCoin.create({ userId });
   return userData;
+}
+
+async function getConfig() {
+  let config = await CasinoConfig.findOne({ _id: 'global' });
+  if (!config) config = await CasinoConfig.create({ _id: 'global' });
+  return config;
 }
 
 function insufficientFunds(bet, balance) {
@@ -26,42 +33,39 @@ function insufficientFunds(bet, balance) {
 
 // ── Slot Machine ──
 
-const SLOT_SYMBOLS = ['🍒', '🍋', '🍊', '🍇', '🍉', '💎', '7️⃣'];
-const SLOT_WEIGHTS = [25, 22, 20, 15, 10, 5, 3];
-
-function weightedRandom() {
-  const total = SLOT_WEIGHTS.reduce((a, b) => a + b, 0);
+function weightedRandom(symbols, weights) {
+  const total = weights.reduce((a, b) => a + b, 0);
   let r = Math.random() * total;
-  for (let i = 0; i < SLOT_SYMBOLS.length; i++) {
-    r -= SLOT_WEIGHTS[i];
-    if (r <= 0) return SLOT_SYMBOLS[i];
+  for (let i = 0; i < symbols.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return symbols[i];
   }
-  return SLOT_SYMBOLS[SLOT_SYMBOLS.length - 1];
+  return symbols[symbols.length - 1];
 }
 
 async function runSlot(interaction, bet) {
-  const userData = await getUserData(interaction.user.id);
+  const [userData, config] = await Promise.all([getUserData(interaction.user.id), getConfig()]);
   if (userData.balance < bet) {
     return interaction.reply({ embeds: [insufficientFunds(bet, userData.balance)], ephemeral: true });
   }
 
-  const r1 = weightedRandom();
-  const r2 = weightedRandom();
-  const r3 = weightedRandom();
+  const r1 = weightedRandom(config.slotSymbols, config.slotWeights);
+  const r2 = weightedRandom(config.slotSymbols, config.slotWeights);
+  const r3 = weightedRandom(config.slotSymbols, config.slotWeights);
 
   let multiplier = 0;
   let resultText = '';
 
   if (r1 === r2 && r2 === r3) {
     if (r1 === '7️⃣' || r1 === '💎') {
-      multiplier = 25;
+      multiplier = config.slotJackpotMult;
       resultText = `JACKPOT! Triple ${r1}!`;
     } else {
-      multiplier = 10;
+      multiplier = config.slotTripleMult;
       resultText = 'TRIPLE MATCH!';
     }
   } else if (r1 === r2 || r2 === r3 || r1 === r3) {
-    multiplier = 3;
+    multiplier = config.slotDoubleMult;
     resultText = 'Double Match!';
   }
 
@@ -81,7 +85,7 @@ async function runSlot(interaction, bet) {
   }
   await userData.save();
 
-  const reels = `┌──────────────────┐\n│  ${r1} │ ${r2} │ ${r3}  │\n└──────────────────┘`;
+  const reels = `┌─────────────────┐\n│  ${r1} │ ${r2} │ ${r3}  │\n└─────────────────┘`;
 
   return interaction.reply({
     embeds: [
@@ -102,12 +106,12 @@ async function runSlot(interaction, bet) {
 // ── Coinflip ──
 
 async function runCoinflip(interaction, bet, choice) {
-  const userData = await getUserData(interaction.user.id);
+  const [userData, config] = await Promise.all([getUserData(interaction.user.id), getConfig()]);
   if (userData.balance < bet) {
     return interaction.reply({ embeds: [insufficientFunds(bet, userData.balance)], ephemeral: true });
   }
 
-  const result = Math.random() < 0.5 ? 'heads' : 'tails';
+  const result = Math.random() * 100 < config.coinflipWinRate ? 'heads' : 'tails';
   const emoji = result === 'heads' ? '🪙' : '🌕';
   const won = result === choice;
 
@@ -148,7 +152,7 @@ async function runCoinflip(interaction, bet, choice) {
 const DICE_FACES = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
 
 async function runDice(interaction, bet, prediction) {
-  const userData = await getUserData(interaction.user.id);
+  const [userData, config] = await Promise.all([getUserData(interaction.user.id), getConfig()]);
   if (userData.balance < bet) {
     return interaction.reply({ embeds: [insufficientFunds(bet, userData.balance)], ephemeral: true });
   }
@@ -159,9 +163,9 @@ async function runDice(interaction, bet, prediction) {
 
   let won = false;
   let multiplier = 0;
-  if (prediction === 'under' && total < 7) { won = true; multiplier = 2; }
-  else if (prediction === 'seven' && total === 7) { won = true; multiplier = 4; }
-  else if (prediction === 'over' && total > 7) { won = true; multiplier = 2; }
+  if (prediction === 'under' && total < 7) { won = true; multiplier = config.diceUnderMult; }
+  else if (prediction === 'seven' && total === 7) { won = true; multiplier = config.diceExactMult; }
+  else if (prediction === 'over' && total > 7) { won = true; multiplier = config.diceOverMult; }
 
   userData.balance -= bet;
   userData.totalSpent += bet;
@@ -201,7 +205,6 @@ async function runDice(interaction, bet, prediction) {
 
 const CARDS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 const SUITS = ['♠', '♥', '♦', '♣'];
-const SUIT_COLORS = { '♠': '♠', '♥': '♥', '♦': '♦', '♣': '♣' };
 
 function drawCard() {
   const rank = CARDS[Math.floor(Math.random() * CARDS.length)];
@@ -221,7 +224,7 @@ function formatCard(c) { return `${c.rank}${c.suit}`; }
 function formatHand(hand) { return hand.map(formatCard).join(' '); }
 
 async function runBlackjack(interaction, bet) {
-  const userData = await getUserData(interaction.user.id);
+  const [userData, config] = await Promise.all([getUserData(interaction.user.id), getConfig()]);
   if (userData.balance < bet) {
     return interaction.reply({ embeds: [insufficientFunds(bet, userData.balance)], ephemeral: true });
   }
@@ -235,7 +238,7 @@ async function runBlackjack(interaction, bet) {
   userData.totalSpent += bet;
 
   if (bj) {
-    const winnings = Math.floor(bet * 2.5);
+    const winnings = Math.floor(bet * config.blackjackBjMult);
     userData.balance += winnings;
     userData.totalEarned += winnings;
     await userData.save();
@@ -245,7 +248,7 @@ async function runBlackjack(interaction, bet) {
         new EmbedBuilder()
           .setColor(0xffd700)
           .setTitle('🃏 Blackjack — BLACKJACK!')
-          .setDescription(`**Your Hand:** ${formatHand(playerHand)} (${handValue(playerHand)})\n**Dealer:** ${formatHand(dealerHand)} (${handValue(dealerHand)})\n\nYou got a natural **Blackjack**! Won **${winnings.toLocaleString()} eksoscoin**! (2.5x)`)
+          .setDescription(`**Your Hand:** ${formatHand(playerHand)} (${handValue(playerHand)})\n**Dealer:** ${formatHand(dealerHand)} (${handValue(dealerHand)})\n\nYou got a natural **Blackjack**! Won **${winnings.toLocaleString()} eksoscoin**! (${config.blackjackBjMult}x)`)
           .addFields({ name: 'Balance', value: `${userData.balance.toLocaleString()} eksoscoin` })
           .setTimestamp(),
       ],
@@ -351,7 +354,7 @@ async function runBlackjack(interaction, bet) {
 
     let color, desc;
     if (dv > 21 || pv > dv) {
-      const winnings = bet * 2;
+      const winnings = bet * config.blackjackWinMult;
       userData.balance += winnings;
       userData.totalEarned += winnings;
       color = 0x57f287;
@@ -394,7 +397,7 @@ const ROULETTE_NUMBERS = {
 const RED_NUMBERS = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
 
 async function runRoulette(interaction, bet, choice) {
-  const userData = await getUserData(interaction.user.id);
+  const [userData, config] = await Promise.all([getUserData(interaction.user.id), getConfig()]);
   if (userData.balance < bet) {
     return interaction.reply({ embeds: [insufficientFunds(bet, userData.balance)], ephemeral: true });
   }
@@ -409,14 +412,14 @@ async function runRoulette(interaction, bet, choice) {
   let won = false;
   let multiplier = 0;
 
-  if (choice === 'red' && RED_NUMBERS.includes(result)) { won = true; multiplier = 2; }
-  else if (choice === 'black' && !RED_NUMBERS.includes(result) && result !== 0) { won = true; multiplier = 2; }
-  else if (choice === 'green' && result === 0) { won = true; multiplier = 14; }
-  else if (choice === 'odd' && result !== 0 && result % 2 !== 0) { won = true; multiplier = 2; }
-  else if (choice === 'even' && result !== 0 && result % 2 === 0) { won = true; multiplier = 2; }
-  else if (choice === 'low' && result >= 1 && result <= 18) { won = true; multiplier = 2; }
-  else if (choice === 'high' && result >= 19 && result <= 36) { won = true; multiplier = 2; }
-  else if (!isNaN(parseInt(choice)) && parseInt(choice) === result) { won = true; multiplier = 36; }
+  if (choice === 'red' && RED_NUMBERS.includes(result)) { won = true; multiplier = config.rouletteColorMult; }
+  else if (choice === 'black' && !RED_NUMBERS.includes(result) && result !== 0) { won = true; multiplier = config.rouletteColorMult; }
+  else if (choice === 'green' && result === 0) { won = true; multiplier = config.rouletteGreenMult; }
+  else if (choice === 'odd' && result !== 0 && result % 2 !== 0) { won = true; multiplier = config.rouletteColorMult; }
+  else if (choice === 'even' && result !== 0 && result % 2 === 0) { won = true; multiplier = config.rouletteColorMult; }
+  else if (choice === 'low' && result >= 1 && result <= 18) { won = true; multiplier = config.rouletteColorMult; }
+  else if (choice === 'high' && result >= 19 && result <= 36) { won = true; multiplier = config.rouletteColorMult; }
+  else if (!isNaN(parseInt(choice)) && parseInt(choice) === result) { won = true; multiplier = config.rouletteNumberMult; }
 
   let embedColor, desc;
   if (won) {
@@ -447,16 +450,17 @@ async function runRoulette(interaction, bet, choice) {
   });
 }
 
-// ── Mines ──
+// ── Mines (4x4 grid) ──
 
 async function runMines(interaction, bet) {
-  const userData = await getUserData(interaction.user.id);
+  const [userData, config] = await Promise.all([getUserData(interaction.user.id), getConfig()]);
   if (userData.balance < bet) {
     return interaction.reply({ embeds: [insufficientFunds(bet, userData.balance)], ephemeral: true });
   }
 
-  const GRID_SIZE = 25;
-  const MINE_COUNT = 5;
+  const GRID_SIZE = 16;
+  const COLS = 4;
+  const MINE_COUNT = Math.min(config.minesCount, GRID_SIZE - 1);
   const mines = new Set();
   while (mines.size < MINE_COUNT) mines.add(Math.floor(Math.random() * GRID_SIZE));
 
@@ -466,14 +470,13 @@ async function runMines(interaction, bet) {
 
   let revealed = new Set();
   let multiplier = 1;
-  let gameOver = false;
 
   function buildGrid() {
     let rows = [];
-    for (let y = 0; y < 5; y++) {
+    for (let y = 0; y < COLS; y++) {
       let row = '';
-      for (let x = 0; x < 5; x++) {
-        const idx = y * 5 + x;
+      for (let x = 0; x < COLS; x++) {
+        const idx = y * COLS + x;
         if (revealed.has(idx)) {
           row += mines.has(idx) ? '💥' : '💎';
         } else {
@@ -487,10 +490,10 @@ async function runMines(interaction, bet) {
 
   function buildButtons() {
     const rows = [];
-    for (let y = 0; y < 5; y++) {
+    for (let y = 0; y < COLS; y++) {
       const row = new ActionRowBuilder();
-      for (let x = 0; x < 5; x++) {
-        const idx = y * 5 + x;
+      for (let x = 0; x < COLS; x++) {
+        const idx = y * COLS + x;
         row.addComponents(
           new ButtonBuilder()
             .setCustomId(`mine_${idx}`)
@@ -511,9 +514,6 @@ async function runMines(interaction, bet) {
     rows.push(cashoutRow);
     return rows;
   }
-
-  const safeTiles = GRID_SIZE - MINE_COUNT;
-  const totalMultiplier = 1 + (safeTiles / MINE_COUNT) * 0.5;
 
   const embed = new EmbedBuilder()
     .setColor(0xf5a623)
@@ -545,7 +545,7 @@ async function runMines(interaction, bet) {
         if (mines.has(i) && !revealed.has(i)) mineReveal += '💣';
         else if (revealed.has(i)) mineReveal += mines.has(i) ? '💥' : '💎';
         else mineReveal += '⬜';
-        if ((i + 1) % 5 === 0) mineReveal += '\n';
+        if ((i + 1) % COLS === 0) mineReveal += '\n';
       }
 
       return interaction.editReply({
@@ -568,7 +568,6 @@ async function runMines(interaction, bet) {
     if (revealed.has(idx)) return;
 
     if (mines.has(idx)) {
-      gameOver = true;
       revealed.add(idx);
       for (let i = 0; i < GRID_SIZE; i++) revealed.add(i);
 
@@ -576,8 +575,8 @@ async function runMines(interaction, bet) {
 
       let mineReveal = '';
       for (let i = 0; i < GRID_SIZE; i++) {
-        mineReveal += mines.has(i) ? '💣' : '⬜';
-        if ((i + 1) % 5 === 0) mineReveal += '\n';
+        mineReveal += mines.has(i) ? '💣' : (revealed.has(i) ? '💎' : '⬜');
+        if ((i + 1) % COLS === 0) mineReveal += '\n';
       }
 
       return interaction.editReply({
@@ -596,7 +595,7 @@ async function runMines(interaction, bet) {
     }
 
     revealed.add(idx);
-    multiplier = 1 + revealed.size * 0.5;
+    multiplier = 1 + revealed.size * 0.75;
 
     await interaction.editReply({
       embeds: [
@@ -633,30 +632,28 @@ async function runMines(interaction, bet) {
 
 // ── Color Game ──
 
-const COLORS = [
-  { name: 'red', emoji: '🔴', weight: 50, multiplier: 2 },
-  { name: 'yellow', emoji: '🟡', weight: 30, multiplier: 3 },
-  { name: 'green', emoji: '🟢', weight: 20, multiplier: 5 },
-];
-
-function pickColor() {
-  const total = COLORS.reduce((a, c) => a + c.weight, 0);
-  let r = Math.random() * total;
-  for (const c of COLORS) {
-    r -= c.weight;
-    if (r <= 0) return c;
-  }
-  return COLORS[COLORS.length - 1];
-}
-
 async function runColor(interaction, bet, choice) {
-  const userData = await getUserData(interaction.user.id);
+  const [userData, config] = await Promise.all([getUserData(interaction.user.id), getConfig()]);
+
+  const colorDefs = [
+    { name: 'red', emoji: '🔴', weight: config.colorRedWeight, multiplier: config.colorRedMult },
+    { name: 'yellow', emoji: '🟡', weight: config.colorYellowWeight, multiplier: config.colorYellowMult },
+    { name: 'green', emoji: '🟢', weight: config.colorGreenWeight, multiplier: config.colorGreenMult },
+  ];
+
   if (userData.balance < bet) {
     return interaction.reply({ embeds: [insufficientFunds(bet, userData.balance)], ephemeral: true });
   }
 
-  const picked = COLORS.find((c) => c.name === choice);
-  const result = pickColor();
+  const totalWeight = colorDefs.reduce((a, c) => a + c.weight, 0);
+  let r = Math.random() * totalWeight;
+  let result = colorDefs[colorDefs.length - 1];
+  for (const c of colorDefs) {
+    r -= c.weight;
+    if (r <= 0) { result = c; break; }
+  }
+
+  const picked = colorDefs.find((c) => c.name === choice);
   const won = result.name === choice;
 
   userData.balance -= bet;
@@ -675,7 +672,7 @@ async function runColor(interaction, bet, choice) {
   }
   await userData.save();
 
-  const colorBar = COLORS.map((c) => {
+  const colorBar = colorDefs.map((c) => {
     const bar = '█'.repeat(Math.round(c.weight / 5));
     const marker = c.name === choice ? ' ◄' : '';
     return `${c.emoji} ${c.name.charAt(0).toUpperCase() + c.name.slice(1)}: ${bar} (${c.multiplier}x)${marker}`;

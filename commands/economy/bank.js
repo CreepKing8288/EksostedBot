@@ -2,6 +2,15 @@ const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const EksosCoin = require('../../models/EksosCoin');
 const ServerShop = require('../../models/ServerShop');
 
+function accrueInterest(userData, rate) {
+  if (userData.loan <= 0 || !userData.loanDate || !userData.loanPrincipal) return 0;
+  const now = new Date();
+  const daysSince = Math.floor((now.getTime() - new Date(userData.loanDate).getTime()) / 86400000);
+  if (daysSince <= 0) return 0;
+  const dailyInterest = Math.floor(userData.loanPrincipal * (rate / 100));
+  return dailyInterest * daysSince;
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('bank')
@@ -55,18 +64,6 @@ module.exports = {
         shopData = await ServerShop.create({ guildId: interaction.guild.id });
       }
 
-      if (shopData.bankMaxLoan <= 0) {
-        return interaction.reply({
-          embeds: [
-            new EmbedBuilder()
-              .setColor(0xed4245)
-              .setTitle('Bank Disabled')
-              .setDescription('This server has disabled bank loans.'),
-          ],
-          ephemeral: true,
-        });
-      }
-
       if (userData.loan > 0) {
         return interaction.reply({
           embeds: [
@@ -85,23 +82,11 @@ module.exports = {
       const interest = Math.floor(amount * (rate / 100));
       const totalOwed = amount + interest;
 
-      if (totalOwed > shopData.bankMaxLoan) {
-        return interaction.reply({
-          embeds: [
-            new EmbedBuilder()
-              .setColor(0xed4245)
-              .setTitle('Exceeds Max Loan')
-              .setDescription(
-                `With **${rate}%** interest, you would owe **${totalOwed.toLocaleString()} eksoscoin** but this server's max loan is **${shopData.bankMaxLoan.toLocaleString()} eksoscoin**.`
-              ),
-          ],
-          ephemeral: true,
-        });
-      }
-
       userData.balance += amount;
       userData.totalEarned += amount;
       userData.loan = totalOwed;
+      userData.loanPrincipal = amount;
+      userData.loanDate = new Date();
       userData.loanGuildId = interaction.guild.id;
       await userData.save();
 
@@ -111,11 +96,11 @@ module.exports = {
         .setDescription(`You borrowed **${amount.toLocaleString()} eksoscoin** from the bank.`)
         .addFields(
           { name: 'Borrowed', value: `${amount.toLocaleString()} eksoscoin`, inline: true },
-          { name: 'Interest', value: `${interest.toLocaleString()} eksoscoin (${rate}%)`, inline: true },
+          { name: 'Interest', value: `${interest.toLocaleString()} eksoscoin (${rate}%/day)`, inline: true },
           { name: 'Total Owed', value: `**${totalOwed.toLocaleString()} eksoscoin**`, inline: true },
           { name: 'Wallet', value: `${userData.balance.toLocaleString()} eksoscoin`, inline: true }
         )
-        .setFooter({ text: 'Repay anytime with /bank repay' })
+        .setFooter({ text: 'Interest accumulates daily. Repay anytime with /bank repay' })
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed] });
@@ -130,6 +115,19 @@ module.exports = {
           ],
           ephemeral: true,
         });
+      }
+
+      let shopData = null;
+      if (userData.loanGuildId) {
+        shopData = await ServerShop.findOne({ guildId: userData.loanGuildId });
+      }
+      const rate = shopData ? shopData.bankInterestRate : 10;
+
+      const accumulated = accrueInterest(userData, rate);
+      if (accumulated > 0) {
+        userData.loan += accumulated;
+        userData.loanDate = new Date();
+        await userData.save();
       }
 
       const amount = interaction.options.getInteger('amount');
@@ -153,19 +151,13 @@ module.exports = {
       userData.totalSpent += repayment;
       userData.loan -= repayment;
 
-      let loanGuildName = 'Unknown';
-      if (userData.loanGuildId) {
-        try {
-          const guild = await interaction.client.guilds.fetch(userData.loanGuildId);
-          loanGuildName = guild.name;
-        } catch {}
-      }
-
       let description;
       let embedColor;
 
       if (userData.loan <= 0) {
         userData.loan = 0;
+        userData.loanPrincipal = 0;
+        userData.loanDate = null;
         userData.loanGuildId = null;
         embedColor = 0x57f287;
         description = `You repaid **${repayment.toLocaleString()} eksoscoin** and cleared your debt!`;
@@ -182,7 +174,8 @@ module.exports = {
         .setDescription(description)
         .addFields(
           { name: 'Repaid', value: `${repayment.toLocaleString()} eksoscoin`, inline: true },
-          { name: 'Remaining Debt', value: `${userData.loan.toLocaleString()} eksoscoin`, inline: true },
+          { name: 'Interest Accrued', value: `${accumulated.toLocaleString()} eksoscoin`, inline: true },
+          { name: 'Remaining Debt', value: `**${userData.loan.toLocaleString()} eksoscoin**`, inline: true },
           { name: 'Wallet', value: `${userData.balance.toLocaleString()} eksoscoin`, inline: true }
         )
         .setTimestamp();
@@ -190,13 +183,16 @@ module.exports = {
       await interaction.reply({ embeds: [embed] });
     } else if (sub === 'info') {
       let shopData = null;
-      if (interaction.guild) {
-        shopData = await ServerShop.findOne({ guildId: interaction.guild.id });
+      if (userData.loanGuildId) {
+        shopData = await ServerShop.findOne({ guildId: userData.loanGuildId });
       }
+      const rate = shopData ? shopData.bankInterestRate : 10;
 
       const fields = [];
 
       if (userData.loan > 0) {
+        const accumulated = accrueInterest(userData, rate);
+
         let loanGuildName = 'Unknown';
         if (userData.loanGuildId) {
           try {
@@ -207,7 +203,11 @@ module.exports = {
 
         fields.push(
           { name: '🏦 Outstanding Loan', value: `**${userData.loan.toLocaleString()} eksoscoin**`, inline: true },
-          { name: '📍 Loan From', value: loanGuildName, inline: true }
+          { name: '💰 Principal', value: `${(userData.loanPrincipal || 0).toLocaleString()} eksoscoin`, inline: true },
+          { name: '📈 Interest Accrued', value: `${accumulated.toLocaleString()} eksoscoin`, inline: true },
+          { name: '📊 Daily Rate', value: `${rate}% of principal (${Math.floor((userData.loanPrincipal || 0) * (rate / 100)).toLocaleString()}/day)`, inline: true },
+          { name: '📍 Loan From', value: loanGuildName, inline: true },
+          { name: '📅 Borrowed', value: userData.loanDate ? `<t:${Math.floor(new Date(userData.loanDate).getTime() / 1000)}:R>` : 'Unknown', inline: true }
         );
       } else {
         fields.push(
@@ -216,6 +216,7 @@ module.exports = {
       }
 
       fields.push(
+        { name: '\u200b', value: '\u200b', inline: false },
         { name: '💰 Wallet', value: `${userData.balance.toLocaleString()} eksoscoin`, inline: true },
         { name: '🏦 Bank', value: `${userData.bank.toLocaleString()} eksoscoin`, inline: true },
         { name: '💎 Total', value: `${(userData.balance + userData.bank).toLocaleString()} eksoscoin`, inline: true }
@@ -224,16 +225,8 @@ module.exports = {
       if (shopData) {
         fields.push(
           { name: '── Server Bank Info ──', value: '\u200b', inline: false },
-          { name: '📊 Interest Rate', value: `${shopData.bankInterestRate}%`, inline: true },
-          { name: '📈 Max Loan', value: `${shopData.bankMaxLoan.toLocaleString()} eksoscoin`, inline: true }
+          { name: '📊 Interest Rate', value: `${rate}% per day`, inline: true }
         );
-
-        if (shopData.bankMaxLoan > 0 && shopData.bankInterestRate >= 0) {
-          const maxBorrowBeforeInterest = Math.floor(shopData.bankMaxLoan / (1 + shopData.bankInterestRate / 100));
-          fields.push(
-            { name: '💵 Max Borrowable', value: `**${maxBorrowBeforeInterest.toLocaleString()} eksoscoin** (before interest)`, inline: false }
-          );
-        }
       }
 
       const embed = new EmbedBuilder()

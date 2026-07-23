@@ -11,15 +11,7 @@ module.exports = {
         .setName('rate')
         .setDescription('Set the loan interest rate for this server.')
         .addIntegerOption((o) =>
-          o.setName('percent').setDescription('Interest rate (0-100).').setRequired(true).setMinValue(0).setMaxValue(100)
-        )
-    )
-    .addSubcommand((sub) =>
-      sub
-        .setName('max-loan')
-        .setDescription('Set the maximum total loan amount for this server.')
-        .addIntegerOption((o) =>
-          o.setName('amount').setDescription('Max loan amount (0 = disable loans).').setRequired(true).setMinValue(0)
+          o.setName('percent').setDescription('Daily interest rate (0-100).').setRequired(true).setMinValue(0).setMaxValue(100)
         )
     )
     .addSubcommand((sub) =>
@@ -55,43 +47,25 @@ module.exports = {
       const embed = new EmbedBuilder()
         .setColor(0x57f287)
         .setTitle('Interest Rate Updated')
-        .setDescription(`Bank loan interest rate set to **${percent}%** for this server.`)
+        .setDescription(`Bank loan interest rate set to **${percent}%** per day for this server.`)
         .addFields(
-          { name: 'New Rate', value: `${percent}%`, inline: true },
-          { name: 'Max Loan', value: `${shopData.bankMaxLoan.toLocaleString()} eksoscoin`, inline: true }
-        )
-        .setTimestamp();
-
-      await interaction.reply({ embeds: [embed] });
-    } else if (sub === 'max-loan') {
-      const amount = interaction.options.getInteger('amount');
-      shopData.bankMaxLoan = amount;
-      await shopData.save();
-
-      const status = amount > 0 ? 'enabled' : 'disabled';
-      const embed = new EmbedBuilder()
-        .setColor(amount > 0 ? 0x57f287 : 0xed4245)
-        .setTitle('Max Loan Updated')
-        .setDescription(`Bank loans have been **${status}** for this server.`)
-        .addFields(
-          { name: 'Max Loan', value: amount > 0 ? `${amount.toLocaleString()} eksoscoin` : 'Disabled', inline: true },
-          { name: 'Interest Rate', value: `${shopData.bankInterestRate}%`, inline: true }
+          { name: 'New Rate', value: `${percent}%/day`, inline: true },
+          { name: 'Example', value: `Borrow 10,000 → owe ${10000 + Math.floor(10000 * percent / 100)}/day`, inline: true }
         )
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed] });
     } else if (sub === 'info') {
-      const maxBorrowable = shopData.bankMaxLoan > 0
-        ? Math.floor(shopData.bankMaxLoan / (1 + shopData.bankInterestRate / 100))
-        : 0;
+      const rate = shopData.bankInterestRate;
+      const exampleDaily = Math.floor(10000 * (rate / 100));
 
       const embed = new EmbedBuilder()
         .setColor(0xf5a623)
         .setTitle(`${interaction.guild.name} Bank Config`)
         .addFields(
-          { name: '📊 Interest Rate', value: `${shopData.bankInterestRate}%`, inline: true },
-          { name: '📈 Max Loan (total owed)', value: shopData.bankMaxLoan > 0 ? `${shopData.bankMaxLoan.toLocaleString()} eksoscoin` : 'Disabled', inline: true },
-          { name: '💵 Max Borrowable (before interest)', value: shopData.bankMaxLoan > 0 ? `${maxBorrowable.toLocaleString()} eksoscoin` : 'N/A', inline: true }
+          { name: '📊 Daily Interest Rate', value: `${rate}%`, inline: true },
+          { name: '💡 Example', value: `Borrow 10,000 → **${exampleDaily.toLocaleString()}/day** interest`, inline: false },
+          { name: '📝 Notes', value: '• Interest is fixed on the original borrowed amount\n• Interest accumulates daily until repaid\n• No max loan limit', inline: false }
         )
         .setTimestamp();
 

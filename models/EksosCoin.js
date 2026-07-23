@@ -12,6 +12,8 @@ const eksosCoinSchema = new mongoose.Schema({
   lastSlot: { type: Date, default: null },
   loan: { type: Number, default: 0 },
   loanGuildId: { type: String, default: null },
+  loanPrincipal: { type: Number, default: 0 },
+  loanDate: { type: Date, default: null },
   inventory: {
     type: [
       {
