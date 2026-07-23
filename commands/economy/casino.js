@@ -452,7 +452,7 @@ async function runRoulette(interaction, bet, choice) {
 
 // ── Mines (4x4 grid) ──
 
-async function runMines(interaction, bet) {
+async function runMines(interaction, bet, bombCount) {
   const [userData, config] = await Promise.all([getUserData(interaction.user.id), getConfig()]);
   if (userData.balance < bet) {
     return interaction.reply({ embeds: [insufficientFunds(bet, userData.balance)], ephemeral: true });
@@ -460,16 +460,22 @@ async function runMines(interaction, bet) {
 
   const GRID_SIZE = 16;
   const COLS = 4;
-  const MINE_COUNT = Math.min(config.minesCount, GRID_SIZE - 1);
+  const mines_count = Math.max(4, Math.min(bombCount || config.minesCount || 4, 10));
+  const safe_tiles = GRID_SIZE - mines_count;
+
   const mines = new Set();
-  while (mines.size < MINE_COUNT) mines.add(Math.floor(Math.random() * GRID_SIZE));
+  while (mines.size < mines_count) mines.add(Math.floor(Math.random() * GRID_SIZE));
 
   userData.balance -= bet;
   userData.totalSpent += bet;
   await userData.save();
 
   let revealed = new Set();
-  let multiplier = 1;
+  let multiplier = 2;
+
+  function calcMultiplier(revealedCount) {
+    return 2 * safe_tiles / (safe_tiles - revealedCount);
+  }
 
   function buildGrid() {
     let rows = [];
@@ -519,7 +525,7 @@ async function runMines(interaction, bet) {
     .setColor(0xf5a623)
     .setTitle('💣 Mines')
     .setDescription(
-      `Pick tiles to reveal gems! Avoid the mines!\n\n${buildGrid()}\n\n**Bet:** ${bet.toLocaleString()} eksoscoin | **Multiplier:** ${multiplier}x`
+      `Pick tiles to reveal gems! Avoid the ${mines_count} mines!\n\n${buildGrid()}\n\n**Bet:** ${bet.toLocaleString()} eksoscoin | **Multiplier:** ${multiplier.toFixed(2)}x | **Potential:** ${Math.floor(bet * multiplier).toLocaleString()} eksoscoin`
     )
     .setTimestamp();
 
@@ -595,7 +601,7 @@ async function runMines(interaction, bet) {
     }
 
     revealed.add(idx);
-    multiplier = 1 + revealed.size * 0.75;
+    multiplier = calcMultiplier(revealed.size);
 
     await interaction.editReply({
       embeds: [
@@ -603,7 +609,7 @@ async function runMines(interaction, bet) {
           .setColor(0xf5a623)
           .setTitle('💣 Mines')
           .setDescription(
-            `Pick tiles to reveal gems! Avoid the mines!\n\n${buildGrid()}\n\n**Bet:** ${bet.toLocaleString()} eksoscoin | **Multiplier:** ${multiplier.toFixed(2)}x | **Potential:** ${Math.floor(bet * multiplier).toLocaleString()} eksoscoin`
+            `Pick tiles to reveal gems! Avoid the ${mines_count} mines!\n\n${buildGrid()}\n\n**Bet:** ${bet.toLocaleString()} eksoscoin | **Multiplier:** ${multiplier.toFixed(2)}x | **Potential:** ${Math.floor(bet * multiplier).toLocaleString()} eksoscoin`
           )
           .setTimestamp(),
       ],
@@ -781,6 +787,9 @@ module.exports = {
         .addIntegerOption((o) =>
           o.setName('bet').setDescription('Amount to bet.').setRequired(true).setMinValue(10)
         )
+        .addIntegerOption((o) =>
+          o.setName('bombs').setDescription('Number of bombs (4-10). More bombs = higher multiplier.').setMinValue(4).setMaxValue(10)
+        )
     )
     .addSubcommand((sub) =>
       sub
@@ -823,8 +832,10 @@ module.exports = {
         const choice = interaction.options.getString('choice');
         return runRoulette(interaction, bet, choice);
       }
-      case 'mines':
-        return runMines(interaction, bet);
+      case 'mines': {
+        const bombs = interaction.options.getInteger('bombs') || 4;
+        return runMines(interaction, bet, bombs);
+      }
       case 'color': {
         const choice = interaction.options.getString('choice');
         return runColor(interaction, bet, choice);

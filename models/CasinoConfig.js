@@ -16,7 +16,7 @@ const casinoConfigSchema = new mongoose.Schema({
   rouletteColorMult: { type: Number, default: 2 },
   rouletteGreenMult: { type: Number, default: 14 },
   rouletteNumberMult: { type: Number, default: 36 },
-  minesCount: { type: Number, default: 4, min: 1, max: 10 },
+  minesCount: { type: Number, default: 4, min: 4, max: 10 },
   colorRedWeight: { type: Number, default: 50 },
   colorRedMult: { type: Number, default: 2 },
   colorYellowWeight: { type: Number, default: 30 },
