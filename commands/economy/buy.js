@@ -6,10 +6,9 @@ const BotShopConfig = require('../../models/BotShopConfig');
 const NOTE_BOOST = 10000;
 
 const WALLET_PROTECTION = [
-  { match: 'wallet shield (1 day)', duration: 1 * 24 * 60 * 60 * 1000, price: 10000, label: '1 Day' },
-  { match: 'wallet shield (3 days)', duration: 3 * 24 * 60 * 60 * 1000, price: 25000, label: '3 Days' },
-  { match: 'wallet shield (7 days)', duration: 7 * 24 * 60 * 60 * 1000, price: 35000, label: '7 Days' },
-  { match: 'wallet shield (30 days)', duration: 30 * 24 * 60 * 60 * 1000, price: 150000, label: '30 Days' },
+  { match: 'wallet shield (1 day)', duration: 1 * 24 * 60 * 60 * 1000, priceKey: 'walletShield1dPrice', defaultPrice: 10000, label: '1 Day' },
+  { match: 'wallet shield (3 days)', duration: 3 * 24 * 60 * 60 * 1000, priceKey: 'walletShield3dPrice', defaultPrice: 25000, label: '3 Days' },
+  { match: 'wallet shield (7 days)', duration: 7 * 24 * 60 * 60 * 1000, priceKey: 'walletShield7dPrice', defaultPrice: 35000, label: '7 Days' },
 ];
 
 module.exports = {
@@ -67,8 +66,13 @@ module.exports = {
 
       userData.balance -= price;
       userData.totalSpent += price;
-      userData.bankNotesUsed += 1;
-      userData.bankLimit += NOTE_BOOST;
+
+      const existing = userData.inventory.find((i) => i.itemId === 'bank_note');
+      if (existing) {
+        existing.quantity += 1;
+      } else {
+        userData.inventory.push({ itemId: 'bank_note', name: 'Bank Note', quantity: 1 });
+      }
       await userData.save();
 
       const embed = new EmbedBuilder()
@@ -76,10 +80,10 @@ module.exports = {
         .setTitle('Bank Note Purchased!')
         .setDescription(`You bought a **Bank Note** for **${price.toLocaleString()} eksoscoin**!`)
         .addFields(
-          { name: 'Bank Limit', value: `**${userData.bankLimit.toLocaleString()} eksoscoin**`, inline: true },
-          { name: 'Notes Bought', value: `${userData.bankNotesUsed}`, inline: true },
+          { name: 'Remaining in Inventory', value: `${userData.inventory.find((i) => i.itemId === 'bank_note')?.quantity || 0}`, inline: true },
           { name: 'Remaining Balance', value: `${userData.balance.toLocaleString()} eksoscoin`, inline: true }
         )
+        .setFooter({ text: 'Use /inventory use item:Bank Note to activate it.' })
         .setTimestamp();
 
       return interaction.reply({ embeds: [embed] });
@@ -88,38 +92,46 @@ module.exports = {
     // Wallet Protection items
     const wpMatch = WALLET_PROTECTION.find((wp) => itemName === wp.match);
     if (wpMatch) {
-      if (userData.balance < wpMatch.price) {
+      let botShopConfig = await BotShopConfig.findOne({ _id: 'global' });
+      if (!botShopConfig) botShopConfig = await BotShopConfig.create({ _id: 'global' });
+      const price = botShopConfig[wpMatch.priceKey] || wpMatch.defaultPrice;
+
+      if (userData.balance < price) {
         return interaction.reply({
           embeds: [
             new EmbedBuilder()
               .setColor(0xed4245)
               .setTitle('Insufficient Funds')
               .setDescription(
-                `You need **${wpMatch.price.toLocaleString()} eksoscoin** but only have **${userData.balance.toLocaleString()}**.`
+                `You need **${price.toLocaleString()} eksoscoin** but only have **${userData.balance.toLocaleString()}**.`
               ),
           ],
           ephemeral: true,
         });
       }
 
-      const now = new Date();
-      const currentExpiry = userData.walletProtectedUntil && userData.walletProtectedUntil.getTime() > now.getTime()
-        ? userData.walletProtectedUntil.getTime()
-        : now.getTime();
-      userData.walletProtectedUntil = new Date(currentExpiry + wpMatch.duration);
+      userData.balance -= price;
+      userData.totalSpent += price;
 
-      userData.balance -= wpMatch.price;
-      userData.totalSpent += wpMatch.price;
+      const invName = `Wallet Shield (${wpMatch.label})`;
+      const invId = `wallet_shield_${wpMatch.label.toLowerCase().replace(/ /g, '')}`;
+      const existing = userData.inventory.find((i) => i.itemId === invId);
+      if (existing) {
+        existing.quantity += 1;
+      } else {
+        userData.inventory.push({ itemId: invId, name: invName, quantity: 1 });
+      }
       await userData.save();
 
       const embed = new EmbedBuilder()
         .setColor(0x57f287)
-        .setTitle('Wallet Shield Activated!')
-        .setDescription(`You bought a **Wallet Shield (${wpMatch.label})** for **${wpMatch.price.toLocaleString()} eksoscoin**!`)
+        .setTitle('Wallet Shield Purchased!')
+        .setDescription(`You bought a **Wallet Shield (${wpMatch.label})** for **${price.toLocaleString()} eksoscoin**!`)
         .addFields(
-          { name: 'Protected Until', value: `<t:${Math.floor(userData.walletProtectedUntil.getTime() / 1000)}:F>`, inline: true },
+          { name: 'Remaining in Inventory', value: `${userData.inventory.find((i) => i.itemId === invId)?.quantity || 0}`, inline: true },
           { name: 'Remaining Balance', value: `${userData.balance.toLocaleString()} eksoscoin`, inline: true }
         )
+        .setFooter({ text: `Use /inventory use item:${invName} to activate it.` })
         .setTimestamp();
 
       return interaction.reply({ embeds: [embed] });
@@ -191,6 +203,8 @@ module.exports = {
       itemId: item.itemId,
       name: item.name,
       quantity: 1,
+      roleId: item.roleId || null,
+      xpMultiplier: item.xpMultiplier || null,
     });
     await userData.save();
 
@@ -200,23 +214,13 @@ module.exports = {
     item.purchaseCount += 1;
     await shopData.save();
 
-    if (item.type === 'role' && item.roleId) {
-      try {
-        const member = await interaction.guild.members.fetch(userId);
-        const role = await interaction.guild.roles.fetch(item.roleId);
-        if (role) {
-          await member.roles.add(role);
-        }
-      } catch {
-        // Role may not be assignable
-      }
-    }
-
     let confirmationText = `You purchased **${item.name}** for **${item.price.toLocaleString()} eksoscoin**!`;
-    if (item.type === 'role' && item.roleId) {
-      confirmationText += '\nYour role has been assigned!';
+    if (item.type === 'role') {
+      confirmationText += '\nIt has been added to your inventory. Use `/inventory use` to assign the role!';
     } else if (item.type === 'xp_boost') {
-      confirmationText += `\nYou now have a **${item.xpMultiplier}x XP boost**!`;
+      confirmationText += `\nIt has been added to your inventory. Use \`/inventory use\` to activate the **${item.xpMultiplier}x XP boost**!`;
+    } else {
+      confirmationText += '\nIt has been added to your inventory. Use `/inventory use` to activate it!';
     }
 
     const embed = new EmbedBuilder()
@@ -233,20 +237,21 @@ module.exports = {
 
   async autocomplete(interaction) {
     const focused = interaction.options.getFocused().toLowerCase();
-    const items = [
+    let items = [
       { name: `Bank Note - ${(10000).toLocaleString()} eksoscoin`, value: 'Bank Note' },
-      { name: 'Wallet Shield (1 Day) - 10,000 eksoscoin', value: 'Wallet Shield (1 Day)' },
-      { name: 'Wallet Shield (3 Days) - 25,000 eksoscoin', value: 'Wallet Shield (3 Days)' },
-      { name: 'Wallet Shield (7 Days) - 35,000 eksoscoin', value: 'Wallet Shield (7 Days)' },
-      { name: 'Wallet Shield (30 Days) - 150,000 eksoscoin', value: 'Wallet Shield (30 Days)' },
+      { name: `Wallet Shield (1 Day) - 10,000 eksoscoin`, value: 'Wallet Shield (1 Day)' },
+      { name: `Wallet Shield (3 Days) - 25,000 eksoscoin`, value: 'Wallet Shield (3 Days)' },
+      { name: `Wallet Shield (7 Days) - 35,000 eksoscoin`, value: 'Wallet Shield (7 Days)' },
     ];
 
-    // Update bank note price from config
+    // Update prices from config
     try {
-      const BotShopConfig = require('../../models/BotShopConfig');
       const config = await BotShopConfig.findOne({ _id: 'global' });
       if (config) {
         items[0].name = `Bank Note - ${(config.bankNotePrice || 10000).toLocaleString()} eksoscoin`;
+        items[1].name = `Wallet Shield (1 Day) - ${(config.walletShield1dPrice || 10000).toLocaleString()} eksoscoin`;
+        items[2].name = `Wallet Shield (3 Days) - ${(config.walletShield3dPrice || 25000).toLocaleString()} eksoscoin`;
+        items[3].name = `Wallet Shield (7 Days) - ${(config.walletShield7dPrice || 35000).toLocaleString()} eksoscoin`;
       }
     } catch {}
 

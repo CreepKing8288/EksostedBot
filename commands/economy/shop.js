@@ -6,10 +6,9 @@ const BotShopConfig = require('../../models/BotShopConfig');
 const NOTE_BOOST = 10000;
 
 const WALLET_PROTECTION = [
-  { name: '🛡️ Wallet Shield (1 Day)', duration: 1 * 24 * 60 * 60 * 1000, price: 10000 },
-  { name: '🛡️ Wallet Shield (3 Days)', duration: 3 * 24 * 60 * 60 * 1000, price: 25000 },
-  { name: '🛡️ Wallet Shield (7 Days)', duration: 7 * 24 * 60 * 60 * 1000, price: 35000 },
-  { name: '🛡️ Wallet Shield (30 Days)', duration: 30 * 24 * 60 * 60 * 1000, price: 150000 },
+  { name: '🛡️ Wallet Shield (1 Day)', duration: 1 * 24 * 60 * 60 * 1000, priceKey: 'walletShield1dPrice', defaultPrice: 10000 },
+  { name: '🛡️ Wallet Shield (3 Days)', duration: 3 * 24 * 60 * 60 * 1000, priceKey: 'walletShield3dPrice', defaultPrice: 25000 },
+  { name: '🛡️ Wallet Shield (7 Days)', duration: 7 * 24 * 60 * 60 * 1000, priceKey: 'walletShield7dPrice', defaultPrice: 35000 },
 ];
 
 module.exports = {
@@ -73,13 +72,14 @@ module.exports = {
 
     const now = Date.now();
     for (const wp of WALLET_PROTECTION) {
+      const price = botShopConfig[wp.priceKey] || wp.defaultPrice;
       const remaining = userData.walletProtectedUntil && userData.walletProtectedUntil.getTime() > now
         ? Math.ceil((userData.walletProtectedUntil.getTime() - now) / 3600000)
         : 0;
       const status = remaining > 0 ? `\n> 🟢 Active (${remaining}h remaining)` : '';
       fields.push({
         name: wp.name,
-        value: `**${wp.price.toLocaleString()} eksoscoin**\nProtects your wallet from /rob for ${wp.duration / 86400000} day(s).${status}`,
+        value: `**${price.toLocaleString()} eksoscoin**\nProtects your wallet from /rob for ${wp.duration / 86400000} day(s).${status}`,
         inline: true,
       });
     }

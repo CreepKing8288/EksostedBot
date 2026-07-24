@@ -1701,6 +1701,9 @@ async function loadBotShopConfig() {
     if (!res.ok) throw new Error('Failed to load');
     const config = await res.json();
     document.getElementById('botshop-bankNotePrice').value = config.bankNotePrice ?? 10000;
+    document.getElementById('botshop-walletShield1dPrice').value = config.walletShield1dPrice ?? 10000;
+    document.getElementById('botshop-walletShield3dPrice').value = config.walletShield3dPrice ?? 25000;
+    document.getElementById('botshop-walletShield7dPrice').value = config.walletShield7dPrice ?? 35000;
   } catch (err) {
     showToast('Failed to load bot shop config.', 'error');
   }
@@ -1709,6 +1712,9 @@ async function loadBotShopConfig() {
 async function saveBotShopConfig() {
   const payload = {
     bankNotePrice: parseInt(document.getElementById('botshop-bankNotePrice').value) || 10000,
+    walletShield1dPrice: parseInt(document.getElementById('botshop-walletShield1dPrice').value) || 10000,
+    walletShield3dPrice: parseInt(document.getElementById('botshop-walletShield3dPrice').value) || 25000,
+    walletShield7dPrice: parseInt(document.getElementById('botshop-walletShield7dPrice').value) || 35000,
   };
   try {
     const res = await fetch('/api/botshop-config', {

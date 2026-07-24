@@ -1223,9 +1223,12 @@ app.get('/api/botshop-config', requireOwner, async (req, res) => {
 app.post('/api/botshop-config', requireOwner, async (req, res) => {
   try {
     const BotShopConfig = require('./models/BotShopConfig');
-    const { bankNotePrice } = req.body;
+    const { bankNotePrice, walletShield1dPrice, walletShield3dPrice, walletShield7dPrice } = req.body;
     const update = {};
     if (bankNotePrice !== undefined) update.bankNotePrice = Math.max(0, Number(bankNotePrice));
+    if (walletShield1dPrice !== undefined) update.walletShield1dPrice = Math.max(0, Number(walletShield1dPrice));
+    if (walletShield3dPrice !== undefined) update.walletShield3dPrice = Math.max(0, Number(walletShield3dPrice));
+    if (walletShield7dPrice !== undefined) update.walletShield7dPrice = Math.max(0, Number(walletShield7dPrice));
     const config = await BotShopConfig.findOneAndUpdate(
       { _id: 'global' },
       { $set: update },

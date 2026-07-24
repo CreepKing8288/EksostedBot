@@ -30,6 +30,8 @@ const eksosCoinSchema = new mongoose.Schema({
         itemId: { type: String, required: true },
         name: { type: String, required: true },
         quantity: { type: Number, default: 1 },
+        roleId: { type: String, default: null },
+        xpMultiplier: { type: Number, default: null },
       },
     ],
     default: [],
