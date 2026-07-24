@@ -156,6 +156,9 @@
           <a href="#" class="nav-item" data-panel="casinoconfig">
             <span class="nav-icon">🎰</span> Casino Config
           </a>
+          <a href="#" class="nav-item" data-panel="botshopconfig">
+            <span class="nav-icon">🛒</span> Bot Shop Config
+          </a>
         </div>
       </nav>
 
@@ -1667,6 +1670,30 @@
 
             </div>
             <button class="btn btn-primary" onclick="saveCasinoConfig()" style="margin-top: 1.5rem;">Save Casino Config</button>
+          </div>
+        </div>
+
+        <!-- BOT SHOP CONFIG PANEL (Owner Only) -->
+        <div class="panel" id="panel-botshopconfig">
+          <div class="panel-header">
+            <h2>Bot Shop Config</h2>
+            <p>Global built-in shop item prices. Affects all servers.</p>
+          </div>
+          <div class="panel-body">
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 1.25rem;">
+
+              <!-- BANK NOTE -->
+              <div class="card" style="max-width:none;">
+                <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 1rem;">📗 Bank Note</h3>
+                <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 1rem;">Increases a user's bank limit by +10,000 when purchased via /buy bank note.</p>
+                <div class="form-group">
+                  <label class="form-label">Price (eksoscoin)</label>
+                  <input type="number" class="form-input" id="botshop-bankNotePrice" min="0" placeholder="10000">
+                </div>
+              </div>
+
+            </div>
+            <button class="btn btn-primary" onclick="saveBotShopConfig()" style="margin-top: 1.5rem;">Save Bot Shop Config</button>
           </div>
         </div>
 

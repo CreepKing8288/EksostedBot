@@ -14,6 +14,16 @@ const eksosCoinSchema = new mongoose.Schema({
   loanGuildId: { type: String, default: null },
   loanPrincipal: { type: Number, default: 0 },
   loanDate: { type: Date, default: null },
+  bankLimit: { type: Number, default: 10000 },
+  bankNotesUsed: { type: Number, default: 0 },
+  casinoSpent: { type: Number, default: 0 },
+  casinoWins: { type: Number, default: 0 },
+  casinoLosses: { type: Number, default: 0 },
+  casinoBiggestBet: { type: Number, default: 0 },
+  casinoPlays: { type: Number, default: 0 },
+  walletProtectedUntil: { type: Date, default: null },
+  lastRobbed: { type: Date, default: null },
+  robCooldownUntil: { type: Date, default: null },
   inventory: {
     type: [
       {

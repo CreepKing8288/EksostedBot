@@ -31,6 +31,14 @@ function insufficientFunds(bet, balance) {
     );
 }
 
+function trackCasino(userData, bet, won) {
+  userData.casinoSpent += bet;
+  userData.casinoPlays += 1;
+  if (bet > userData.casinoBiggestBet) userData.casinoBiggestBet = bet;
+  if (won) userData.casinoWins += 1;
+  else userData.casinoLosses += 1;
+}
+
 // ── Slot Machine ──
 
 function weightedRandom(symbols, weights) {
@@ -77,9 +85,11 @@ async function runSlot(interaction, bet) {
   if (multiplier > 0) {
     userData.balance += winnings;
     userData.totalEarned += winnings;
+    trackCasino(userData, bet, true);
     color = 0x57f287;
     desc = `${resultText}\nYou won **${winnings.toLocaleString()} eksoscoin**! (${multiplier}x)`;
   } else {
+    trackCasino(userData, bet, false);
     color = 0xed4245;
     desc = 'No match! Better luck next time!';
   }
@@ -123,9 +133,11 @@ async function runCoinflip(interaction, bet, choice) {
     const winnings = bet * 2;
     userData.balance += winnings;
     userData.totalEarned += winnings;
+    trackCasino(userData, bet, true);
     color = 0x57f287;
     desc = `The coin landed on **${result.toUpperCase()}** ${emoji}\nYou won **${winnings.toLocaleString()} eksoscoin**!`;
   } else {
+    trackCasino(userData, bet, false);
     color = 0xed4245;
     desc = `The coin landed on **${result.toUpperCase()}** ${emoji}\nYou lost **${bet.toLocaleString()} eksoscoin**!`;
   }
@@ -175,9 +187,11 @@ async function runDice(interaction, bet, prediction) {
     const winnings = bet * multiplier;
     userData.balance += winnings;
     userData.totalEarned += winnings;
+    trackCasino(userData, bet, true);
     color = 0x57f287;
     desc = `You rolled **${total}** ${DICE_FACES[die1 - 1]} ${DICE_FACES[die2 - 1]}\nYou won **${winnings.toLocaleString()} eksoscoin**! (${multiplier}x)`;
   } else {
+    trackCasino(userData, bet, false);
     color = 0xed4245;
     desc = `You rolled **${total}** ${DICE_FACES[die1 - 1]} ${DICE_FACES[die2 - 1]}\nYou lost **${bet.toLocaleString()} eksoscoin**!`;
   }
@@ -241,6 +255,7 @@ async function runBlackjack(interaction, bet) {
     const winnings = Math.floor(bet * config.blackjackBjMult);
     userData.balance += winnings;
     userData.totalEarned += winnings;
+    trackCasino(userData, bet, true);
     await userData.save();
 
     return interaction.reply({
@@ -298,6 +313,7 @@ async function runBlackjack(interaction, bet) {
 
     if (pv > 21) {
       collector.stop('bust');
+      trackCasino(userData, bet, false);
       await userData.save();
       return interaction.editReply({
         embeds: [
@@ -357,6 +373,7 @@ async function runBlackjack(interaction, bet) {
       const winnings = bet * config.blackjackWinMult;
       userData.balance += winnings;
       userData.totalEarned += winnings;
+      trackCasino(userData, bet, true);
       color = 0x57f287;
       desc = `**Your Hand:** ${formatHand(playerHand)} (${pv})\n**Dealer:** ${formatHand(dealerHand)} (${dv})\n\nYou won **${winnings.toLocaleString()} eksoscoin**!`;
     } else if (pv === dv) {
@@ -364,6 +381,7 @@ async function runBlackjack(interaction, bet) {
       desc = `**Your Hand:** ${formatHand(playerHand)} (${pv})\n**Dealer:** ${formatHand(dealerHand)} (${dv})\n\nPush! Bet returned.`;
       color = 0xfee75c;
     } else {
+      trackCasino(userData, bet, false);
       color = 0xed4245;
       desc = `**Your Hand:** ${formatHand(playerHand)} (${pv})\n**Dealer:** ${formatHand(dealerHand)} (${dv})\n\nDealer wins! Lost **${bet.toLocaleString()} eksoscoin**.`;
     }
@@ -426,9 +444,11 @@ async function runRoulette(interaction, bet, choice) {
     const winnings = bet * multiplier;
     userData.balance += winnings;
     userData.totalEarned += winnings;
+    trackCasino(userData, bet, true);
     embedColor = 0x57f287;
     desc = `The ball landed on **${result}** ${colorEmoji}\nYou won **${winnings.toLocaleString()} eksoscoin**! (${multiplier}x)`;
   } else {
+    trackCasino(userData, bet, false);
     embedColor = 0xed4245;
     desc = `The ball landed on **${result}** ${colorEmoji}\nYou lost **${bet.toLocaleString()} eksoscoin**!`;
   }
@@ -545,6 +565,7 @@ async function runMines(interaction, bet, bombCount) {
       const winnings = Math.floor(bet * multiplier);
       userData.balance += winnings;
       userData.totalEarned += winnings;
+      trackCasino(userData, bet, true);
       await userData.save();
 
       let mineReveal = '';
@@ -579,6 +600,7 @@ async function runMines(interaction, bet, bombCount) {
       for (let i = 0; i < GRID_SIZE; i++) revealed.add(i);
 
       collector.stop('mine_hit');
+      trackCasino(userData, bet, false);
 
       let mineReveal = '';
       for (let i = 0; i < GRID_SIZE; i++) {
@@ -621,6 +643,7 @@ async function runMines(interaction, bet, bombCount) {
   collector.on('end', async (_, reason) => {
     if (reason === 'cashout' || reason === 'mine_hit') return;
 
+    trackCasino(userData, bet, false);
     for (let i = 0; i < GRID_SIZE; i++) revealed.add(i);
 
     await interaction.editReply({
@@ -671,9 +694,11 @@ async function runColor(interaction, bet, choice) {
     const winnings = Math.floor(bet * picked.multiplier);
     userData.balance += winnings;
     userData.totalEarned += winnings;
+    trackCasino(userData, bet, true);
     embedColor = 0x57f287;
     desc = `The wheel landed on ${result.emoji} **${result.name.toUpperCase()}**!\nYou won **${winnings.toLocaleString()} eksoscoin**! (${picked.multiplier}x)`;
   } else {
+    trackCasino(userData, bet, false);
     embedColor = 0xed4245;
     desc = `The wheel landed on ${result.emoji} **${result.name.toUpperCase()}**!\nYou lost **${bet.toLocaleString()} eksoscoin**!`;
   }
@@ -810,10 +835,171 @@ module.exports = {
               { name: '🟢 Green (5x)', value: 'green' }
             )
         )
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('top')
+        .setDescription('View the casino leaderboard.')
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('help')
+        .setDescription('Learn how to play a casino game.')
+        .addStringOption((o) =>
+          o
+            .setName('game')
+            .setDescription('Which game to learn about.')
+            .setRequired(true)
+            .addChoices(
+              { name: 'All Games', value: 'all' },
+              { name: '🎰 Slot Machine', value: 'slot' },
+              { name: '🪙 Coinflip', value: 'coinflip' },
+              { name: '🎲 Dice', value: 'dice' },
+              { name: '🃏 Blackjack', value: 'blackjack' },
+              { name: '🎡 Roulette', value: 'roulette' },
+              { name: '💣 Mines', value: 'mines' },
+              { name: '🎨 Color Game', value: 'color' }
+            )
+        )
     ),
 
   async execute(interaction) {
     const sub = interaction.options.getSubcommand();
+
+    if (sub === 'top') {
+      await interaction.deferReply();
+
+      const topUsers = await EksosCoin.find({ casinoPlays: { $gt: 0 } })
+        .sort({ casinoSpent: -1 })
+        .limit(15)
+        .lean();
+
+      if (topUsers.length === 0) {
+        return interaction.editReply({
+          embeds: [
+            new EmbedBuilder()
+              .setColor(0xfee75c)
+              .setTitle('No Data')
+              .setDescription('No one has played casino games yet!'),
+          ],
+        });
+      }
+
+      const medals = ['🥇', '🥈', '🥉'];
+      const fields = [];
+
+      for (let i = 0; i < topUsers.length; i++) {
+        const entry = topUsers[i];
+        let username = `User ${entry.userId}`;
+        try {
+          const user = await interaction.client.users.fetch(entry.userId);
+          if (user) username = user.tag;
+        } catch {}
+
+        const rank = i < 3 ? medals[i] : `#${i + 1}`;
+        const winRate = entry.casinoPlays > 0 ? ((entry.casinoWins / entry.casinoPlays) * 100).toFixed(1) : '0.0';
+        fields.push({
+          name: `${rank} ${username}`,
+          value: `💰 Spent: **${entry.casinoSpent.toLocaleString()}** | Biggest Bet: **${entry.casinoBiggestBet.toLocaleString()}**\n✅ Wins: ${entry.casinoWins} | ❌ Losses: ${entry.casinoLosses} | 🎮 Plays: ${entry.casinoPlays} | Win Rate: ${winRate}%`,
+          inline: false,
+        });
+      }
+
+      const embed = new EmbedBuilder()
+        .setColor(0xffd700)
+        .setTitle('🎰 Casino Leaderboard')
+        .setDescription('Top casino players ranked by total coins spent.')
+        .addFields(fields)
+        .setTimestamp();
+
+      return interaction.editReply({ embeds: [embed] });
+    }
+
+    if (sub === 'help') {
+      const game = interaction.options.getString('game');
+
+      const games = {
+        slot: {
+          emoji: '🎰', name: 'Slot Machine',
+          desc: 'Spin 3 reels and match symbols to win!',
+          usage: '/casino slot bet:100',
+          mechanics: 'Three reels spin randomly. Match 2 or 3 symbols for payouts.',
+          payouts: '• Triple 7️⃣/💎 (Jackpot): Configurable multiplier\n• Triple match: Configurable multiplier\n• Double match: Configurable multiplier\n• No match: Lose your bet',
+        },
+        coinflip: {
+          emoji: '🪙', name: 'Coinflip',
+          desc: 'Pick heads or tails — double or nothing!',
+          usage: '/casino coinflip bet:100 choice:heads',
+          mechanics: 'A coin is flipped. Pick the correct side to double your bet.',
+          payouts: '• Correct: 2x your bet\n• Wrong: Lose your bet',
+        },
+        dice: {
+          emoji: '🎲', name: 'Dice',
+          desc: 'Roll two dice and predict the total!',
+          usage: '/casino dice bet:100 prediction:under',
+          mechanics: 'Two dice are rolled (2-12 total). Pick under 7, exactly 7, or over 7.',
+          payouts: '• Under 7 / Over 7: 2x\n• Exactly 7: 4x\n• Wrong: Lose your bet',
+        },
+        blackjack: {
+          emoji: '🃏', name: 'Blackjack',
+          desc: 'Beat the dealer without going over 21!',
+          usage: '/casino blackjack bet:100',
+          mechanics: 'Get closer to 21 than the dealer. Hit to draw, Stand to hold, Double Down to double your bet and draw one card.',
+          payouts: '• Natural Blackjack (21): Configurable multiplier\n• Beat dealer: Configurable multiplier\n• Push (tie): Bet returned\n• Bust or dealer wins: Lose your bet',
+        },
+        roulette: {
+          emoji: '🎡', name: 'Roulette',
+          desc: 'Spin the wheel and bet on where the ball lands!',
+          usage: '/casino roulette bet:100 choice:red',
+          mechanics: 'A ball lands on a number 0-36. Green (0), Red (18 numbers), Black (17 numbers).',
+          payouts: '• Color (red/black): 2x\n• Odd/Even: 2x\n• Low (1-18)/High (19-36): 2x\n• Green (0): 14x\n• Exact number: 36x',
+        },
+        mines: {
+          emoji: '💣', name: 'Mines',
+          desc: 'Pick tiles to find gems — avoid the bombs!',
+          usage: '/casino mines bet:100 bombs:5',
+          mechanics: '4x4 grid (16 tiles). Choose 4-10 bombs. Reveal safe tiles to increase your multiplier. Cash out anytime to collect!',
+          payouts: '• Starts at 1x and scales up per tile\n• More bombs = faster multiplier growth\n• Hit a bomb = lose your bet\n• Cash out = collect current multiplier',
+        },
+        color: {
+          emoji: '🎨', name: 'Color Game',
+          desc: 'Pick a color and spin the wheel!',
+          usage: '/casino color bet:100 choice:red',
+          mechanics: 'The wheel lands on a color based on weighted odds.',
+          payouts: '• Red: 2x\n• Yellow: 3x\n• Green: 5x\n• Wrong color: Lose your bet',
+        },
+      };
+
+      if (game === 'all') {
+        const desc = Object.values(games).map(g =>
+          `${g.emoji} **${g.name}** — ${g.desc}\n> Usage: \`${g.usage}\``
+        ).join('\n\n');
+
+        const embed = new EmbedBuilder()
+          .setColor(0xf5a623)
+          .setTitle('🎰 Casino Games — Help')
+          .setDescription(desc)
+          .setFooter({ text: 'Use /casino help game:<name> for detailed info on a specific game.' })
+          .setTimestamp();
+
+        return interaction.reply({ embeds: [embed], ephemeral: true });
+      }
+
+      const g = games[game];
+      const embed = new EmbedBuilder()
+        .setColor(0xf5a623)
+        .setTitle(`${g.emoji} ${g.name} — Help`)
+        .setDescription(g.desc)
+        .addFields(
+          { name: 'How to Play', value: g.mechanics, inline: false },
+          { name: 'Usage', value: `\`${g.usage}\``, inline: false },
+          { name: 'Payouts', value: g.payouts, inline: false }
+        )
+        .setTimestamp();
+
+      return interaction.reply({ embeds: [embed], ephemeral: true });
+    }
+
     const bet = interaction.options.getInteger('bet');
 
     switch (sub) {

@@ -218,7 +218,7 @@ module.exports = {
       fields.push(
         { name: '\u200b', value: '\u200b', inline: false },
         { name: '💰 Wallet', value: `${userData.balance.toLocaleString()} eksoscoin`, inline: true },
-        { name: '🏦 Bank', value: `${userData.bank.toLocaleString()} eksoscoin`, inline: true },
+        { name: '🏦 Bank', value: `${userData.bank.toLocaleString()} / ${userData.bankLimit.toLocaleString()} eksoscoin`, inline: true },
         { name: '💎 Total', value: `${(userData.balance + userData.bank).toLocaleString()} eksoscoin`, inline: true }
       );
 

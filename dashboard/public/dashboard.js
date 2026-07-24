@@ -39,6 +39,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (coinNav) coinNav.style.display = 'none';
     const casinoNav = document.querySelector('.nav-item[data-panel="casinoconfig"]');
     if (casinoNav) casinoNav.style.display = 'none';
+    const botshopNav = document.querySelector('.nav-item[data-panel="botshopconfig"]');
+    if (botshopNav) botshopNav.style.display = 'none';
   }
 
   document.querySelectorAll('.nav-item').forEach(item => {
@@ -518,6 +520,7 @@ function switchPanel(panelName) {
     servershop: 'Server Shop',
     coinadmin: 'EksosCoin Admin',
     casinoconfig: 'Casino Config',
+    botshopconfig: 'Bot Shop Config',
   };
 
   document.getElementById('topbarTitle').textContent = titles[panelName] || 'Dashboard';
@@ -548,6 +551,9 @@ function switchPanel(panelName) {
   }
   if (panelName === 'casinoconfig') {
     loadCasinoConfig();
+  }
+  if (panelName === 'botshopconfig') {
+    loadBotShopConfig();
   }
 }
 
@@ -1683,6 +1689,35 @@ async function saveCasinoConfig() {
     });
     if (!res.ok) throw new Error('Failed to save');
     showToast('Casino config saved!', 'success');
+  } catch (err) {
+    showToast(`Failed: ${err.message}`, 'error');
+  }
+}
+
+// ===== BOT SHOP CONFIG =====
+async function loadBotShopConfig() {
+  try {
+    const res = await fetch('/api/botshop-config');
+    if (!res.ok) throw new Error('Failed to load');
+    const config = await res.json();
+    document.getElementById('botshop-bankNotePrice').value = config.bankNotePrice ?? 10000;
+  } catch (err) {
+    showToast('Failed to load bot shop config.', 'error');
+  }
+}
+
+async function saveBotShopConfig() {
+  const payload = {
+    bankNotePrice: parseInt(document.getElementById('botshop-bankNotePrice').value) || 10000,
+  };
+  try {
+    const res = await fetch('/api/botshop-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Failed to save');
+    showToast('Bot shop config saved!', 'success');
   } catch (err) {
     showToast(`Failed: ${err.message}`, 'error');
   }

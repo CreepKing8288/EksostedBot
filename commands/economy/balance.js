@@ -59,14 +59,19 @@ module.exports = {
       }
 
       const total = userData.balance + userData.bank;
+      const now = Date.now();
+      const protectedUntil = userData.walletProtectedUntil && userData.walletProtectedUntil.getTime() > now;
+      const protectionText = protectedUntil
+        ? `\n🛡️ Wallet Shield active until <t:${Math.floor(userData.walletProtectedUntil.getTime() / 1000)}:R>`
+        : '';
 
       const embed = new EmbedBuilder()
         .setColor(0xf5a623)
         .setTitle(`${target.username}'s EksosCoin Wallet`)
         .setThumbnail(target.displayAvatarURL({ dynamic: true }))
         .addFields(
-          { name: '💰 Wallet', value: `${userData.balance.toLocaleString()} eksoscoin`, inline: true },
-          { name: '🏦 Bank', value: `${userData.bank.toLocaleString()} eksoscoin`, inline: true },
+          { name: '💰 Wallet', value: `${userData.balance.toLocaleString()} eksoscoin${protectionText}`, inline: true },
+          { name: '🏦 Bank', value: `${userData.bank.toLocaleString()} / ${userData.bankLimit.toLocaleString()} eksoscoin`, inline: true },
           { name: '💎 Total', value: `${total.toLocaleString()} eksoscoin`, inline: true }
         )
         .setFooter({ text: 'EksosCoin is a global currency across all servers.' })
@@ -101,6 +106,21 @@ module.exports = {
         });
       }
 
+      if (userData.bank + depositAmount > userData.bankLimit) {
+        const canDeposit = Math.max(0, userData.bankLimit - userData.bank);
+        return interaction.reply({
+          embeds: [
+            new EmbedBuilder()
+              .setColor(0xed4245)
+              .setTitle('Bank Limit Reached')
+              .setDescription(
+                `Your bank can only hold **${userData.bankLimit.toLocaleString()} eksoscoin**.\nYou can deposit up to **${canDeposit.toLocaleString()}** more. Buy a Bank Note from the shop to increase your limit!`
+              ),
+          ],
+          ephemeral: true,
+        });
+      }
+
       userData.balance -= depositAmount;
       userData.bank += depositAmount;
       await userData.save();
@@ -111,7 +131,7 @@ module.exports = {
         .setDescription(`Deposited **${depositAmount.toLocaleString()} eksoscoin** into your bank.`)
         .addFields(
           { name: 'Wallet', value: `${userData.balance.toLocaleString()} eksoscoin`, inline: true },
-          { name: 'Bank', value: `${userData.bank.toLocaleString()} eksoscoin`, inline: true }
+          { name: 'Bank', value: `${userData.bank.toLocaleString()} / ${userData.bankLimit.toLocaleString()} eksoscoin`, inline: true }
         )
         .setTimestamp();
 
@@ -154,7 +174,7 @@ module.exports = {
         .setDescription(`Withdrew **${withdrawAmount.toLocaleString()} eksoscoin** from your bank.`)
         .addFields(
           { name: 'Wallet', value: `${userData.balance.toLocaleString()} eksoscoin`, inline: true },
-          { name: 'Bank', value: `${userData.bank.toLocaleString()} eksoscoin`, inline: true }
+          { name: 'Bank', value: `${userData.bank.toLocaleString()} / ${userData.bankLimit.toLocaleString()} eksoscoin`, inline: true }
         )
         .setTimestamp();
 

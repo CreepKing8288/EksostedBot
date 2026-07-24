@@ -1207,6 +1207,37 @@ app.delete('/api/guild/:guildId/shop/items/:itemId', requireAuth, async (req, re
   }
 });
 
+// ===== BOT SHOP CONFIG API (Owner Only) =====
+app.get('/api/botshop-config', requireOwner, async (req, res) => {
+  try {
+    const BotShopConfig = require('./models/BotShopConfig');
+    let config = await BotShopConfig.findOne({ _id: 'global' });
+    if (!config) config = await BotShopConfig.create({ _id: 'global' });
+    res.json(config);
+  } catch (err) {
+    console.error('Error fetching botshop config:', err);
+    res.status(500).json({ error: 'Failed to fetch botshop config' });
+  }
+});
+
+app.post('/api/botshop-config', requireOwner, async (req, res) => {
+  try {
+    const BotShopConfig = require('./models/BotShopConfig');
+    const { bankNotePrice } = req.body;
+    const update = {};
+    if (bankNotePrice !== undefined) update.bankNotePrice = Math.max(0, Number(bankNotePrice));
+    const config = await BotShopConfig.findOneAndUpdate(
+      { _id: 'global' },
+      { $set: update },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    res.json(config);
+  } catch (err) {
+    console.error('Error saving botshop config:', err);
+    res.status(500).json({ error: 'Failed to save botshop config' });
+  }
+});
+
 // ===== CASINO CONFIG API (Owner Only) =====
 app.get('/api/casino-config', requireOwner, async (req, res) => {
   try {
