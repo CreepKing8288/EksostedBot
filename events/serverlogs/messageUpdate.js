@@ -28,6 +28,9 @@ module.exports = {
     );
     if (!logChannel) return;
 
+    const attachments = [...newMessage.attachments.values()];
+    const image = attachments.find((a) => a.contentType?.startsWith('image/'));
+
     const embed = new EmbedBuilder()
       .setColor('Orange')
       .setAuthor({
@@ -41,6 +44,15 @@ module.exports = {
       )
       .setFooter({ text: `User ID: ${oldMessage.author.id}` })
       .setTimestamp();
+
+    if (attachments.length > 0)
+      embed.addFields({
+        name: 'Attachments',
+        value: attachments
+          .map((a) => `[${a.name}](${a.url})`)
+          .join('\n'),
+      });
+    if (image) embed.setImage(image.url);
 
     logChannel.send({ embeds: [embed] });
   },
