@@ -93,16 +93,17 @@ module.exports = {
       });
     }
 
-    // Rob: steal 10-30% of victim's wallet, max 100k
-    const stealPercent = 0.10 + Math.random() * 0.20;
-    const stolenAmount = Math.min(100000, Math.max(1, Math.floor(victimData.balance * stealPercent)));
+    // Rob: steal a random amount, capped at 10% of the victim's wallet
+    const stealPercent = 0.01 + Math.random() * 0.09;
+    const stolenAmount = Math.max(1, Math.floor(victimData.balance * stealPercent));
     const caught = Math.random() < 0.35; // 35% chance of getting caught
 
     robberData.robCooldownUntil = new Date(now.getTime() + ROB_COOLDOWN_MS);
 
     if (caught) {
-      // Caught: robber pays fine equal to stolen amount (or all their wallet if less)
-      const fine = Math.min(robberData.balance, stolenAmount);
+      // Caught: robber pays a random fine, capped at 15% of their wallet
+      const finePercent = 0.01 + Math.random() * 0.14;
+      const fine = Math.min(robberData.balance, Math.floor(robberData.balance * finePercent));
       robberData.balance -= fine;
       robberData.totalSpent += fine;
 
