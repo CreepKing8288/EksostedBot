@@ -79,6 +79,11 @@ module.exports = {
                 .setDescription(`⚠️ <@${user.id}> has been warned`)
                 .addFields(
                   {
+                    name: 'Infraction ID',
+                    value: `${warnSchema._id}`,
+                    inline: true,
+                  },
+                  {
                     name: 'Reason',
                     value: `${reason}`,
                     inline: true,
@@ -132,9 +137,9 @@ module.exports = {
         const warnId = interaction.options.getString('warn_id');
 
         const error = new EmbedBuilder()
-          .setDescription(`No warn Id watching \`${warnId}\` was found!`)
+          .setDescription(`No warn Id matching \`${warnId}\` was found!`)
           .setColor(0xed4245);
-        data = await warnings.findOne({ _id: warnId, guildId: guildId });
+        const data = await warnings.findOne({ _id: warnId, guildId: guildId });
         if (!data) return await interaction.reply({ embeds: [error] });
 
         await warnings.deleteOne({ _id: warnId, guildId: guildId });
