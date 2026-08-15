@@ -11,7 +11,7 @@ const isValidUrl = (value) => {
 };
 
 const getCounterDocument = async (db, counterId, guildId) => {
-  const query = { _id: counterId, guildId };
+  const query = { _id: `${counterId}_${guildId}`, guildId };
   const updateOptions = { upsert: true, returnDocument: 'after' };
   try {
     return await db.collection('settings').findOneAndUpdate(
@@ -82,7 +82,7 @@ module.exports = {
       });
     }
 
-    const config = await client.db.collection('settings').findOne({ _id: 'config', guildId: interaction.guild.id });
+    const config = await client.db.collection('settings').findOne({ _id: `config_${interaction.guild.id}`, guildId: interaction.guild.id });
     if (!config?.confession_channel_id || !config?.log_channel_id) {
       return interaction.followUp({
         content: 'The confession system is not configured yet. Please ask an administrator to set the confession and log channels.',
@@ -101,7 +101,7 @@ module.exports = {
 
     let num = counterDoc?.value?.count;
     if (num == null) {
-      const fallbackCounter = await client.db.collection('settings').findOne({ _id: 'confession_counter', guildId: interaction.guild.id });
+      const fallbackCounter = await client.db.collection('settings').findOne({ _id: `confession_counter_${interaction.guild.id}`, guildId: interaction.guild.id });
       num = fallbackCounter?.count ?? 1;
     }
 
@@ -168,7 +168,7 @@ module.exports = {
     const confessionMessage = await confChannel.send({ embeds: [embed], components: [row] });
 
     await client.db.collection('settings').updateOne(
-      { _id: 'config', guildId: interaction.guild.id },
+      { _id: `config_${interaction.guild.id}`, guildId: interaction.guild.id },
       { $set: { last_confession_message_id: confessionMessage.id } },
       { upsert: true }
     );

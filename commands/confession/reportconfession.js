@@ -9,7 +9,7 @@ module.exports = {
     .addStringOption(opt => opt.setName('note').setDescription('Additional details').setRequired(true)),
 
   async execute(interaction, client) {
-    const config = await client.db.collection('settings').findOne({ _id: 'config', guildId: interaction.guild.id });
+    const config = await client.db.collection('settings').findOne({ _id: `config_${interaction.guild.id}`, guildId: interaction.guild.id });
     if (!config?.log_channel_id) return interaction.reply({ content: "Log system not set up.", ephemeral: true });
 
     const reportEmbed = new EmbedBuilder()

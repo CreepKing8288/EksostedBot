@@ -38,14 +38,22 @@ module.exports = {
 
   async execute(interaction, client) {
     const subcommand = interaction.options.getSubcommand();
+    const guildId = interaction.guild.id;
 
     // 1. Set Channels
     if (subcommand === 'setchannel' || subcommand === 'setlogs') {
       const channel = interaction.options.getChannel('channel');
       const key = subcommand === 'setchannel' ? 'confession_channel_id' : 'log_channel_id';
+      const settings = client.db.collection('settings');
 
-      await client.db.collection('settings').updateOne(
-        { _id: 'config', guildId: interaction.guild.id },
+      // Migrate the legacy shared config document into this guild's own config.
+      await settings.updateOne(
+        { _id: 'config', guildId: { $exists: false } },
+        { $set: { _id: `config_${guildId}`, guildId } }
+      );
+
+      await settings.updateOne(
+        { _id: `config_${guildId}`, guildId },
         { $set: { [key]: channel.id } },
         { upsert: true }
       );
@@ -85,7 +93,7 @@ module.exports = {
     if (subcommand === 'remove') {
       const link = interaction.options.getString('link');
       const messageId = link.split('/').pop();
-      const config = await client.db.collection('settings').findOne({ _id: 'config', guildId: interaction.guild.id });
+      const config = await client.db.collection('settings').findOne({ _id: `config_${guildId}`, guildId });
 
       try {
         const channel = await client.channels.fetch(config.confession_channel_id);

@@ -11,7 +11,7 @@ const isValidUrl = (value) => {
 };
 
 const getCounterDocument = async (db, counterId, guildId) => {
-  const query = { _id: counterId, guildId };
+  const query = { _id: `${counterId}_${guildId}`, guildId };
   const updateOptions = { upsert: true, returnDocument: 'after' };
   try {
     return await db.collection('settings').findOneAndUpdate(
@@ -93,7 +93,7 @@ module.exports = {
     }
 
     // 1. Fetch Config
-    const config = await client.db.collection('settings').findOne({ _id: 'config', guildId: interaction.guild.id });
+    const config = await client.db.collection('settings').findOne({ _id: `config_${interaction.guild.id}`, guildId: interaction.guild.id });
     if (!config?.confession_channel_id || !config?.log_channel_id) {
       return interaction.followUp({
         content: 'The confession system is not configured. Please ask an administrator to set both the confession and log channels.',
@@ -137,7 +137,7 @@ module.exports = {
     const counterDoc = await getCounterDocument(client.db, 'reply_counter', interaction.guild.id);
     let replyId = counterDoc?.value?.count ?? counterDoc?.count;
     if (replyId == null) {
-      const fallbackCounter = await client.db.collection('settings').findOne({ _id: 'reply_counter', guildId: interaction.guild.id });
+      const fallbackCounter = await client.db.collection('settings').findOne({ _id: `reply_counter_${interaction.guild.id}`, guildId: interaction.guild.id });
       replyId = fallbackCounter?.count ?? 1;
     }
 
